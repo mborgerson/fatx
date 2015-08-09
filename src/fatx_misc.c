@@ -80,7 +80,7 @@ int fatx_get_path_component(char const *path, size_t component, char const **sta
         component -= 1;
     }
 
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 /*
@@ -91,7 +91,7 @@ int fatx_unpack_date(uint16_t in, struct fatx_ts *out)
     out->year  = FATX_DATE_TO_YEAR(in);
     out->month = FATX_DATE_TO_MONTH(in);
     out->day   = FATX_DATE_TO_DAY(in);
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 /*
@@ -102,5 +102,5 @@ int fatx_unpack_time(uint16_t in, struct fatx_ts *out)
     out->hour   = FATX_TIME_TO_HOUR(in);
     out->minute = FATX_TIME_TO_MINUTE(in);
     out->second = FATX_TIME_TO_SECOND(in);
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }

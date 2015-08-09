@@ -42,16 +42,16 @@ int fatx_read_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry *entry)
     {
         fatx_error(fs, "failed to seek to index %zd in FAT (offset 0x%zx)\n",
                    index, fat_entry_offset);
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     if (fatx_dev_read(fs, entry, fat_entry_size, 1) != 1)
     {
         fatx_error(fs, "failed to read fat index %zd\n", index);
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 /*
@@ -76,7 +76,7 @@ int fatx_get_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_
         return status;
     }
 
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 /*
@@ -136,7 +136,7 @@ int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, size_
     if (cluster < 2 || cluster >= fs->num_clusters)
     {
         fatx_error(fs, "cluster number out of range %zd\n", cluster);
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     /* Clusters begin at index 2 */
@@ -145,7 +145,7 @@ int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, size_
     *offset  = fs->cluster_offset;
     *offset += cluster * fs->bytes_per_cluster;
 
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 /*
@@ -167,8 +167,8 @@ int fatx_get_next_cluster(struct fatx_fs *fs, size_t *cluster)
     if (status == FATX_CLUSTER_DATA)
     {
         *cluster = fat_entry;
-        return 0;
+        return FATX_STATUS_SUCCESS;
     }
 
-    return -1;
+    return FATX_STATUS_ERROR;
 }

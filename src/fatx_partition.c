@@ -47,7 +47,7 @@ int fatx_check_partition_signature(struct fatx_fs *fs)
         return -1;
     }
 
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 /*
@@ -89,5 +89,5 @@ int fatx_process_superblock(struct fatx_fs *fs)
     fs->volume_id    = superblock.volume_id;
     fs->cluster_size = superblock.cluster_size;
 
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }

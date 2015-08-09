@@ -115,7 +115,7 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     fatx_info(fs, "  Root Offset:         0x%zx bytes\n", fs->root_offset);
     fatx_info(fs, "  Root Size:           0x%zx bytes\n", fs->root_size);
     fatx_info(fs, "  Cluster Offset:      0x%zx bytes\n", fs->cluster_offset);
-    return 0;
+    return FATX_STATUS_SUCCESS;
 
     /* Close device. */
 cleanup:
@@ -129,7 +129,7 @@ cleanup:
 int fatx_close_device(struct fatx_fs *fs)
 {
     fclose(fs->device);
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 

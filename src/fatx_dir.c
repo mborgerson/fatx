@@ -124,7 +124,7 @@ int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir)
         }
     }
 
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 
@@ -197,7 +197,7 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
     if (status)
     {
         fatx_error(fs, "failed to seek to directory entry\n");
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     /* Get the real directory entry. */
@@ -205,7 +205,7 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
     if (items != 1)
     {
         fatx_error(fs, "failed to read directory entry\n");
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     /* Was this the last directory entry? */
@@ -254,5 +254,5 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
 int fatx_close_dir(struct fatx_fs *fs, struct fatx_dir *dir)
 {
     /* Nothing to do. */
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }

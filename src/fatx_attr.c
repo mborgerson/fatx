@@ -38,7 +38,7 @@ int fatx_dirent_to_attr(struct fatx_fs *fs, struct fatx_raw_directory_entry *ent
     fatx_unpack_date(entry->accessed_date, &(attr->accessed));
     fatx_unpack_time(entry->accessed_time, &(attr->accessed));
 
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 /*

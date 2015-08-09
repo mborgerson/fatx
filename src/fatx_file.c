@@ -32,7 +32,7 @@ int fatx_find_cluster_for_file_offset(struct fatx_fs *fs, struct fatx_attr *attr
     if (offset >= attr->file_size)
     {
         fatx_error(fs, "offset out of range\n");
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     /* Start at the first cluster and seek through the chain. */
@@ -47,7 +47,7 @@ int fatx_find_cluster_for_file_offset(struct fatx_fs *fs, struct fatx_attr *attr
          * Look in the FAT to find the next cluster number.
          */
         status = fatx_read_fat(fs, cluster, &fat_entry);
-        if (status) return -1;
+        if (status) return status;
 
         status = fatx_get_fat_entry_type(fs, fat_entry);
         if (status == FATX_CLUSTER_DATA)
@@ -59,7 +59,7 @@ int fatx_find_cluster_for_file_offset(struct fatx_fs *fs, struct fatx_attr *attr
         {
             /* Error. */
             fatx_error(fs, "expected another cluster while seeking to file offset\n");
-            return -1;
+            return FATX_STATUS_ERROR;
         }
 
         /* Consume the bytes of the last cluster. */
@@ -67,7 +67,7 @@ int fatx_find_cluster_for_file_offset(struct fatx_fs *fs, struct fatx_attr *attr
     }
 
     *result = cluster;
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 /*
@@ -128,7 +128,7 @@ int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, v
         if (bytes_read == 0)
         {
             fatx_error(fs, "failed to read from device\n");
-            return -1;
+            return FATX_STATUS_ERROR;
         }
 
         total_bytes_read += bytes_read;

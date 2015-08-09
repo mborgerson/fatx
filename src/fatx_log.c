@@ -30,7 +30,7 @@ int fatx_log_init(struct fatx_fs *fs, FILE *stream, int level)
 {
     fs->log_handle = stream;
     fs->log_level  = level;
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 /*
