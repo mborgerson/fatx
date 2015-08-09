@@ -165,17 +165,18 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
         }
         else if (status == FATX_CLUSTER_END)
         {
-            /* This is the end. (Should have received a FATX_END_OF_DIR_MARKER)
-             * before now. */
-            fatx_error(fs, "warning: should have receieved end of dir marker\n");
-            *result = NULL;
-            return 0;
+            /* This is the end of the cluster chain. Should have received a
+             * end-of-directory marker before this point. Directory or FAT may
+             * be corrupt.
+             */
+            fatx_error(fs, "did not get end of directory yet and there's no cluster to go to\n");
+            return FATX_STATUS_ERROR;
         }
         else
         {
             /* Error. */
-            fatx_error(fs, "expected another cluster or the cluster chain end marker\n");
-            return -1;
+            fatx_error(fs, "expected another cluster\n");
+            return FATX_STATUS_ERROR;
         }
     }
 
@@ -188,7 +189,7 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
     else
     {
         status = fatx_cluster_number_to_byte_offset(fs, dir->cluster, &offset);
-        if (status) return -1;
+        if (status) return status;
     }
 
     offset += dir->entry * sizeof(struct fatx_raw_directory_entry);
@@ -242,12 +243,8 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
         }
     }
 
-    /* Set result to indicate successful read. */
     *result = entry;
-
-    /* Increment entry count for next call. */
     dir->entry += 1;
-
     return FATX_STATUS_SUCCESS;
 }
 
