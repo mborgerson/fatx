@@ -157,39 +157,42 @@ int fatx_fuse_read_dir(const char *path, void *buf, fuse_fill_dir_t filler, off_
 
     fatx_debug(pd->fs, "fatx_fuse_read_dir(path=\"%s\", buf=0x%p, offset=0x%zx)\n", path, buf, offset);
 
-    /* Open the directory */
+    /* Open the directory. */
     status = fatx_open_dir(pd->fs, path, &dir);
-    if (status)
-    {
-        return -status;
-    }
+    if (status) return status;
 
-    /* Iterate over directory entries, calling filler() for each */
+    /* Iterate over directory entries, calling filler() for each. */
     while (1)
     {
-        /* Get the next directory entry */
+        /* Get the next directory entry. */
         status = fatx_read_dir(pd->fs, &dir, &dirent, &attr, &nextdirent);
 
-        if (status)
+        if (status == FATX_STATUS_SUCCESS)
+        {
+            /* Found a directory entry, use the filler function to add it. */
+            status = filler(buf, nextdirent->filename, NULL, 0);
+
+            if (status)
+            {
+                /* Could not add directory entry. */
+                status = -ENOMEM;
+                break;
+            }
+        }
+        else if (status == FATX_STATUS_FILE_DELETED)
+        {
+            /* File deleted. Skip over it. */
+            continue;
+        }
+        else if (status == FATX_STATUS_END_OF_DIR)
+        {
+            /* End of directory entries. */
+            status = 0;
+            break;
+        }
+        else
         {
             /* Error */
-            status = -status;
-            break;
-        }
-
-        if (nextdirent == NULL)
-        {
-            /* End of directory entries */
-            break;
-        }
-
-        /* Read successful */
-        status = filler(buf, nextdirent->filename, NULL, 0);
-
-        if (status)
-        {
-            /* Could not add directory entry */
-            status = -ENOMEM;
             break;
         }
     }
@@ -223,7 +226,18 @@ int fatx_fuse_get_attr(const char  *path, struct stat *stbuf)
     }
 
     status = fatx_get_attr(pd->fs, path, &attr);
-    if (status) return -1;
+
+    switch (status)
+    {
+    case FATX_STATUS_SUCCESS:
+        break;
+
+    case FATX_STATUS_FILE_NOT_FOUND:
+        return -ENOENT;
+
+    default:
+        return -1;
+    }
 
     stbuf->st_mode   = 0755;
     stbuf->st_nlink  = 1;
@@ -237,9 +251,13 @@ int fatx_fuse_get_attr(const char  *path, struct stat *stbuf)
     stbuf->st_mtime  = mktime(&timeinfo);
 
     if (attr.attributes & FATX_ATTR_DIRECTORY)
+    {
         stbuf->st_mode |= S_IFDIR;
+    }
     else
+    {
         stbuf->st_mode |= S_IFREG;
+    }
 
     return 0;
 }
@@ -250,13 +268,27 @@ int fatx_fuse_get_attr(const char  *path, struct stat *stbuf)
 int fatx_fuse_open(const char *path, struct fuse_file_info *fi)
 {
     struct fatx_fuse_private_data *pd;
+    struct fatx_attr attr;
+    int status;
 
     pd = fatx_fuse_get_private_data();
     if (pd == NULL) return -1;
 
     fatx_debug(pd->fs, "fatx_fuse_open(path=\"%s\")\n", path);
 
-    return 0;
+    status = fatx_get_attr(pd->fs, path, &attr);
+
+    switch (status)
+    {
+    case FATX_STATUS_SUCCESS:
+        return 0;
+
+    case FATX_STATUS_FILE_NOT_FOUND:
+        return -ENOENT;
+
+    default:
+        return -1;
+    }
 }
 
 /*
@@ -265,13 +297,26 @@ int fatx_fuse_open(const char *path, struct fuse_file_info *fi)
 int fatx_fuse_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     struct fatx_fuse_private_data *pd;
+    int status;
 
     pd = fatx_fuse_get_private_data();
     if (pd == NULL) return -1;
 
     fatx_debug(pd->fs, "fatx_fuse_read(path=\"%s\", buf=0x%p, size=0x%zx, offset=0x%zx)\n", path, (void*)buf, size, offset);
 
-    return fatx_read(pd->fs, path, offset, size, buf);
+    status = fatx_read(pd->fs, path, offset, size, buf);
+
+    switch (status)
+    {
+    case FATX_STATUS_SUCCESS:
+        return 0;
+
+    case FATX_STATUS_FILE_NOT_FOUND:
+        return -ENOENT;
+
+    default:
+        return -1;
+    }
 }
 
 /*

@@ -19,6 +19,13 @@
 
 #include "fatx_internal.h"
 
+/* The root directory is special in that it is the very first cluster, and it
+ * cannot be indexed using the typical 2 index convention. It is always the
+ * first cluster. When fatx_read_dir sees this in the cluster field of struct
+ * fatx_dir, it will read from the root directory cluster.
+ */
+#define FATX_ROOT_DIR_CLUSTER 0
+
 /*
  * Open a directory.
  */
@@ -40,14 +47,8 @@ int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir)
         return -1;
     }
 
-    /* Find the cluster for the root directory. */
-    /* Set cluster to 0 to indicate to fatx_read_dir that it should read from
-     * the root directory.
-     */
-    dir->cluster = 0;
-
-    /* Set initial directory entry index. */
-    dir->entry = 0;
+    dir->cluster = FATX_ROOT_DIR_CLUSTER;
+    dir->entry   = 0;
 
     for (component=1; 1; component++)
     {
@@ -76,13 +77,25 @@ int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir)
         {
             /* Get the next entry in this directory. */
             status = fatx_read_dir(fs, dir, &dirent, &attr, &nextdirent);
-            if (status) return -1;
 
-            if (nextdirent == NULL)
+            if (status == FATX_STATUS_SUCCESS)
             {
-                /* Reached the end of directory. Path not found. */
+                /* Fantastic. See below. */
+            }
+            else if (status == FATX_STATUS_FILE_DELETED)
+            {
+                /* File deleted. Skip over it. */
+                continue;
+            }
+            else if (status == FATX_STATUS_END_OF_DIR)
+            {
                 fatx_error(fs, "path not found\n");
-                return -1;
+                return FATX_STATUS_FILE_NOT_FOUND;
+            }
+            else
+            {
+                /* Error occured. */
+                return FATX_STATUS_ERROR;
             }
 
             fatx_debug(fs, "fatx_read_dir found %s\n", dirent.filename);
@@ -167,7 +180,7 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
     }
 
     /* Seek to directory entry. */
-    if (dir->cluster == 0)
+    if (dir->cluster == FATX_ROOT_DIR_CLUSTER)
     {
         /* Root directory is desired. */
         offset = fs->root_offset;
@@ -200,13 +213,19 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
         /* End of directory. */
         fatx_debug(fs, "got end of dir\n");
         *result = NULL;
-        return 0;
+        return FATX_STATUS_END_OF_DIR;
+    }
+
+    /* Was this file deleted? */
+    if (directory_entry.filename_len == FATX_DELETED_FILE_MARKER)
+    {
+        /* This directory entry is no longer in use. */
+        fatx_debug(fs, "dirent %zd is a deleted file\n", dir->entry);
+        dir->entry += 1;
+        return FATX_STATUS_FILE_DELETED;
     }
 
     fatx_debug(fs, "dirent %zd first cluster is %d\n", dir->entry, directory_entry.first_cluster);
-
-    /* Increment entry count for next call. */
-    dir->entry += 1;
 
     /* Copy filename. */
     memcpy(entry->filename, directory_entry.filename, directory_entry.filename_len);
@@ -219,14 +238,17 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
         if (status)
         {
             fatx_error(fs, "failed to get directory entry attributes\n");
-            return -1;
+            return status;
         }
     }
 
     /* Set result to indicate successful read. */
     *result = entry;
 
-    return 0;
+    /* Increment entry count for next call. */
+    dir->entry += 1;
+
+    return FATX_STATUS_SUCCESS;
 }
 
 /*

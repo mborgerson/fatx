@@ -60,7 +60,7 @@ int fatx_get_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr)
     for (component=0; 1; component++)
     {
         status = fatx_get_path_component(path, component, &start, &len);
-        if (status) return -1;
+        if (status) return status;
 
         if (start == NULL)
         {
@@ -74,23 +74,35 @@ int fatx_get_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr)
     }
 
     status = fatx_open_dir(fs, subpath, &dir);
-    if (status) return -1;
+    if (status) return status;
 
     while (1)
     {
         status = fatx_read_dir(fs, &dir, &dirent, attr, &nextdirent);
-        if (status) return -1;
-        if (nextdirent == NULL)
+        if (status == FATX_STATUS_SUCCESS)
+        {
+            if (strcmp(start, dirent.filename) == 0)
+            {
+                /* Found! */
+                status = FATX_STATUS_SUCCESS;
+                break;
+            }
+        }
+        else if (status == FATX_STATUS_FILE_DELETED)
+        {
+            /* Read a deleted file entry. Skip over it. */
+            continue;
+        }
+        else if (status == FATX_STATUS_END_OF_DIR)
         {
             /* Path not found! */
-            status = -1;
+            status = FATX_STATUS_FILE_NOT_FOUND;
             break;
         }
-
-        if (strcmp(start, dirent.filename) == 0)
+        else
         {
-            /* Found! */
-            status = 0;
+            /* Error */
+            status = FATX_STATUS_ERROR;
             break;
         }
     }

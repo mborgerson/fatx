@@ -41,6 +41,12 @@
 #define FATX_ATTR_VOLUME             (1<<3)
 #define FATX_ATTR_DIRECTORY          (1<<4)
 
+#define FATX_STATUS_FILE_NOT_FOUND  -2
+#define FATX_STATUS_ERROR           -1
+#define FATX_STATUS_SUCCESS          0
+#define FATX_STATUS_FILE_DELETED     1
+#define FATX_STATUS_END_OF_DIR       2
+
 struct fatx_fs {
     char const *device_path;
     FILE       *device;
