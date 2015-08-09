@@ -97,7 +97,7 @@ int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, v
 
     /* Seek to the offset. */
     cluster_offset = offset % fs->bytes_per_cluster;
-    status = fatx_dev_seek(fs, cluster, cluster_offset);
+    status = fatx_dev_seek_cluster(fs, cluster, cluster_offset);
     if (status) return status;
 
     total_bytes_read = 0;
@@ -154,7 +154,7 @@ int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, v
                 return status;
             }
 
-            status = fatx_dev_seek(fs, cluster, 0);
+            status = fatx_dev_seek_cluster(fs, cluster, 0);
             if (status) return status;
 
             cluster_offset = 0;

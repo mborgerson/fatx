@@ -193,7 +193,7 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
     }
 
     offset += dir->entry * sizeof(struct fatx_raw_directory_entry);
-    status = fseek(fs->device, offset, SEEK_SET);
+    status = fatx_dev_seek(fs, offset);
     if (status)
     {
         fatx_error(fs, "failed to seek to directory entry\n");

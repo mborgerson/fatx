@@ -121,7 +121,8 @@ int fatx_check_partition_signature(struct fatx_fs *fs);
 int fatx_process_superblock(struct fatx_fs *fs);
 
 /* Device Functions */
-int fatx_dev_seek(struct fatx_fs *fs, size_t cluster, off_t offset);
+int fatx_dev_seek(struct fatx_fs *fs, off_t offset);
+int fatx_dev_seek_cluster(struct fatx_fs *fs, size_t cluster, off_t offset);
 size_t fatx_dev_read(struct fatx_fs *fs, void *buf, size_t size, size_t items);
 
 /* FAT Functions */

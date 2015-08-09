@@ -38,7 +38,7 @@ int fatx_read_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry *entry)
     fat_entry_offset = fs->fat_offset + index * fat_entry_size;
     *entry           = 0;
 
-    if (fseek(fs->device, fat_entry_offset, SEEK_SET))
+    if (fatx_dev_seek(fs, fat_entry_offset))
     {
         fatx_error(fs, "failed to seek to index %zd in FAT (offset 0x%zx)\n",
                    index, fat_entry_offset);

@@ -22,14 +22,30 @@
 /*
  * Seek to a cluster, byte offset in the device.
  */
-int fatx_dev_seek(struct fatx_fs *fs, size_t cluster, off_t offset)
+int fatx_dev_seek(struct fatx_fs *fs, off_t offset)
+{
+    int status;
+
+    status = fseek(fs->device, offset, SEEK_SET);
+    if (status)
+    {
+        fatx_error(fs, "failed to seek\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
+ * Seek to a cluster, byte offset in the device.
+ */
+int fatx_dev_seek_cluster(struct fatx_fs *fs, size_t cluster, off_t offset)
 {
     int status;
     size_t pos;
 
-    fatx_debug(fs, "fatx_dev_seek(cluster=%zd, offset=0x%zx)\n", cluster, offset);
+    fatx_debug(fs, "fatx_dev_seek_cluster(cluster=%zd, offset=0x%zx)\n", cluster, offset);
 
-    /* Seek to cluster containing offset. */
     status = fatx_cluster_number_to_byte_offset(fs, cluster, &pos);
     if (status) return status;
 
@@ -39,10 +55,10 @@ int fatx_dev_seek(struct fatx_fs *fs, size_t cluster, off_t offset)
     if (status)
     {
         fatx_error(fs, "failed to seek\n");
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
-    return 0;
+    return FATX_STATUS_SUCCESS;
 }
 
 /*

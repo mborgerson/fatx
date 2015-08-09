@@ -27,7 +27,7 @@ int fatx_check_partition_signature(struct fatx_fs *fs)
     uint32_t signature;
     size_t   read;
 
-    if (fseek(fs->device, fs->partition_offset+FATX_SIGNATURE_OFFSET, SEEK_SET))
+    if (fatx_dev_seek(fs, fs->partition_offset+FATX_SIGNATURE_OFFSET))
     {
         fatx_error(fs, "failed to seek to signature\n");
         return -1;
@@ -58,7 +58,7 @@ int fatx_process_superblock(struct fatx_fs *fs)
     struct fatx_superblock superblock;
     size_t read;
 
-    if (fseek(fs->device, fs->partition_offset+FATX_SUPERBLOCK_OFFSET, SEEK_SET))
+    if (fatx_dev_seek(fs, fs->partition_offset+FATX_SUPERBLOCK_OFFSET))
     {
         fatx_error(fs, "failed to seek to superblock\n");
         return -1;
