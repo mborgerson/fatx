@@ -13,10 +13,8 @@ SYNOPSIS
 
 DESCRIPTION
 -----------
-**fatxfs** is a userspace filesystem driver for the FATX filesystem (developed
-by Microsoft for the original Xbox console). `fatxfs` uses the Filesystem in
-USErspace (FUSE) API and as such is compatible with a number of its
-implementations.
+**fatxfs** is a userspace filesystem driver for the FATX filesystem, a varient
+of FAT16/32 developed by Microsoft for the original Xbox console.
 
 <device> should be a path to either a block device or an image file.
 <mountpoint> should be a path to an empty directory.
