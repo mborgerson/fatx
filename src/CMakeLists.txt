@@ -28,6 +28,7 @@ set(LIBFATXFS_SOURCES ${LIBFATXFS_SOURCES}
                       ${CMAKE_CURRENT_SOURCE_DIR}/fatx_log.h
                       ${CMAKE_CURRENT_SOURCE_DIR}/fatx_misc.c
                       ${CMAKE_CURRENT_SOURCE_DIR}/fatx_partition.c
+                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_version.h
                       PARENT_SCOPE
                       )
 

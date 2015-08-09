@@ -20,11 +20,6 @@
 #ifndef FATX_H
 #define FATX_H
 
-#define FATX_VERSION_MAJ    0
-#define FATX_VERSION_MIN    0
-#define FATX_VERSION_BLD    0
-#define FATX_COPYRIGHT_YEAR 2015
-
 #define _XOPEN_SOURCE
 
 #include <stdint.h>

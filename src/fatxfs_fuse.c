@@ -18,6 +18,7 @@
  */
 
 #include "fatx.h"
+#include "fatx_version.h"
 
 #include <errno.h>
 #include <stdlib.h>
