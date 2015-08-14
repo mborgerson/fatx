@@ -131,6 +131,3 @@ int fatx_close_device(struct fatx_fs *fs)
     fclose(fs->device);
     return FATX_STATUS_SUCCESS;
 }
-
-
-

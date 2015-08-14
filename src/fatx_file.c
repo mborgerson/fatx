@@ -165,4 +165,3 @@ int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, v
 
     return total_bytes_read;
 }
-
