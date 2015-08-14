@@ -60,7 +60,7 @@ Or, you can specify the offset and size of the partition manually:
 
 License
 -------
-fatxfs is licensed under the terms of the GNU General Public License (v3 or
+fatxfs is licensed under the terms of the GNU General Public License (v2, or
 later). See LICENSE.txt for full license text.
 
 Credit
