@@ -30,7 +30,7 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/src)
 add_definitions("-ansi -Wall --std=c99 -pedantic")
 add_library(libfatxfs ${LIBFATXFS_SOURCES})
 add_executable(fatxfs ${FATXFS_SOURCES})
-target_link_libraries(fatxfs libfatxfs ${FUSE_LIBRARIES})
+target_link_libraries(fatxfs libfatxfs ${FUSE_LDFLAGS})
 target_include_directories(fatxfs PUBLIC ${FUSE_INCLUDE_DIRS})
 target_compile_options(fatxfs PUBLIC ${FUSE_CFLAGS_OTHER})
 
