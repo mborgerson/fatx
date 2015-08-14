@@ -298,26 +298,13 @@ int fatx_fuse_open(const char *path, struct fuse_file_info *fi)
 int fatx_fuse_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     struct fatx_fuse_private_data *pd;
-    int status;
 
     pd = fatx_fuse_get_private_data();
     if (pd == NULL) return -1;
 
     fatx_debug(pd->fs, "fatx_fuse_read(path=\"%s\", buf=0x%p, size=0x%zx, offset=0x%zx)\n", path, (void*)buf, size, offset);
 
-    status = fatx_read(pd->fs, path, offset, size, buf);
-
-    switch (status)
-    {
-    case FATX_STATUS_SUCCESS:
-        return 0;
-
-    case FATX_STATUS_FILE_NOT_FOUND:
-        return -ENOENT;
-
-    default:
-        return -1;
-    }
+    return fatx_read(pd->fs, path, offset, size, buf);
 }
 
 /*
