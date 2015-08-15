@@ -235,7 +235,7 @@ int fatx_fuse_get_attr(const char  *path, struct stat *stbuf)
 
     if (strcmp(path, "/") == 0)
     {
-        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_mode = S_IFDIR | 0777;
         stbuf->st_nlink = 1;
         return 0;
     }
@@ -254,7 +254,7 @@ int fatx_fuse_get_attr(const char  *path, struct stat *stbuf)
         return -1;
     }
 
-    stbuf->st_mode   = 0755;
+    stbuf->st_mode   = 0777;
     stbuf->st_nlink  = 1;
     stbuf->st_size   = attr.file_size;
     timeinfo.tm_sec  = attr.modified.second;

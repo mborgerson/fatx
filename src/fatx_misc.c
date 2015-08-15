@@ -20,6 +20,8 @@
 #include "fatx_internal.h"
 
 #include <stddef.h>
+#include <string.h>
+#include <libgen.h>
 
 /*
  * Get the specified path component.
@@ -84,24 +86,41 @@ int fatx_get_path_component(char const *path, size_t component, char const **sta
 }
 
 /*
- * Get length of the directory part of path.
+ * Get the dirname for a given path.
  *
- * Given a path such as: /path/to/file
- * Return the length of the string: /path/to/
+ * | path     | dirname |
+ * |----------|---------|
+ * | /usr/lib | /usr    |
+ * | /usr/    | /       |
+ * | usr      | .       |
+ * | /        | /       |
+ * | .        | .       |
+ * | ..       | .       |
+ *
  */
-int fatx_get_dirname_len(char const *path)
+char *fatx_dirname(char *path)
 {
-    /* TODO */
-    return 0;
+    /* TODO: Implement this natively. */
+    return dirname(path);
 }
 
 /*
- * Get the starting character position of the filename from a path.
+ * Get the basename for a given path.
+ *
+ * | path     | basename |
+ * |----------|----------|
+ * | /usr/lib | /lib     |
+ * | /usr/    | usr      |
+ * | usr      | usr      |
+ * | /        | /        |
+ * | .        | .        |
+ * | ..       | ..       |
+ *
  */
-int fatx_get_basename_index(char const *path)
+char *fatx_basename(char *path)
 {
-    /* TODO */
-    return 0;
+    /* TODO: Implement this natively. */
+    return basename(path);
 }
 
 /*

@@ -120,7 +120,7 @@ int fatx_set_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_
 {
     int status;
 
-    fatx_debug(fs, "fatx_set_fat_entry_for_cluster(cluster=%zd)s\n", cluster);
+    fatx_debug(fs, "fatx_set_fat_entry_for_cluster(cluster=%zd)\n", cluster);
 
     if (cluster < 2 || cluster >= fs->num_clusters)
     {
@@ -244,6 +244,39 @@ int fatx_get_next_cluster(struct fatx_fs *fs, size_t *cluster)
  */
 int fatx_mark_cluster_available(struct fatx_fs *fs, size_t cluster)
 {
-    /* TODO */
+    fatx_debug(fs, "fatx_mark_cluster_available(cluster=%zd)\n", cluster);
+    fatx_set_fat_entry_for_cluster(fs, cluster, 0);
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
+ * Free a cluster chain.
+ */
+int fatx_free_cluster_chain(struct fatx_fs *fs, size_t first_cluster)
+{
+    size_t cluster, next_cluster;
+    int status;
+
+    fatx_debug(fs, "fatx_free_cluster_chain(cluster=%zd)\n", first_cluster);
+
+    cluster = next_cluster = first_cluster;
+
+    do
+    {
+        fatx_debug(fs, "marking cluster %zd as available\n", cluster);
+
+        if (fatx_get_next_cluster(fs, &next_cluster) != FATX_STATUS_SUCCESS)
+        {
+            /* Reached the end of the cluster chain. */
+            next_cluster = 0;
+            fatx_debug(fs, "reached end of cluster chain\n");
+        }
+
+        status = fatx_mark_cluster_available(fs, cluster);
+        if (status != FATX_STATUS_SUCCESS) return status;
+
+        cluster = next_cluster;
+    } while (cluster);
+
     return FATX_STATUS_SUCCESS;
 }

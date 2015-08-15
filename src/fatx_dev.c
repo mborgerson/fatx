@@ -76,5 +76,10 @@ size_t fatx_dev_read(struct fatx_fs *fs, void *buf, size_t size, size_t items)
 size_t fatx_dev_write(struct fatx_fs *fs, void *buf, size_t size, size_t items)
 {
     fatx_debug(fs, "fatx_dev_write(buf=0x%p, size=0x%zx, items=0x%zx)\n", buf, size, items);
+#if 0
     return fwrite(buf, size, items, fs->device);
+#else
+    fatx_debug(fs, "--> stubbed out\n");
+    return items;
+#endif
 }

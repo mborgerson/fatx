@@ -142,14 +142,17 @@ int fatx_set_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_
 int fatx_get_fat_entry_type(struct fatx_fs *fs, fatx_fat_entry entry);
 int fatx_get_next_cluster(struct fatx_fs *fs, size_t *cluster);
 int fatx_mark_cluster_available(struct fatx_fs *fs, size_t cluster);
+int fatx_free_cluster_chain(struct fatx_fs *fs, size_t first_cluster);
 
 /* Directory Functions */
-int fatx_next_directory_entry(struct fatx_fs *fs, struct fatx_dir *dir);
 int fatx_dirent_to_attr(struct fatx_fs *fs, struct fatx_raw_directory_entry *entry, struct fatx_attr *attr);
+int fatx_mark_dir_entry_deleted(struct fatx_fs *fs, struct fatx_dir *dir);
 
 /* Misc Functions */
 int fatx_get_path_component(char const *path, size_t component, char const **start, size_t *len);
 int fatx_unpack_date(uint16_t in, struct fatx_ts *out);
 int fatx_unpack_time(uint16_t in, struct fatx_ts *out);
+char *fatx_dirname(char *path);
+char *fatx_basename(char *path);
 
 #endif

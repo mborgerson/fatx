@@ -245,5 +245,124 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
 int fatx_close_dir(struct fatx_fs *fs, struct fatx_dir *dir)
 {
     /* Nothing to do. */
+    fatx_debug(fs, "fatx_close_dir()\n");
     return FATX_STATUS_SUCCESS;
+}
+
+/*
+ * Mark a directory entry as deleted.
+ */
+int fatx_mark_dir_entry_deleted(struct fatx_fs *fs, struct fatx_dir *dir)
+{
+    struct fatx_raw_directory_entry raw_dirent;
+    size_t offset, items;
+    int status;
+
+    fatx_debug(fs, "fatx_mark_dir_entry_deleted(cluster=%zd, entry=%zd)\n", dir->cluster, dir->entry);
+
+    /* Seek to the directory entry. */
+    offset = dir->entry * sizeof(struct fatx_raw_directory_entry);
+    status = fatx_dev_seek_cluster(fs, dir->cluster, offset);
+    if (status)
+    {
+        fatx_error(fs, "failed to seek to directory entry\n");
+        return status;
+    }
+
+    /* Read in the raw directory entry. */
+    items = fatx_dev_read(fs, &raw_dirent, sizeof(struct fatx_raw_directory_entry), 1);
+    if (items != 1)
+    {
+        fatx_error(fs, "failed to read directory entry\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    /* Read advanced the pointer. Seek back. */
+    status = fatx_dev_seek_cluster(fs, dir->cluster, offset);
+    if (status != FATX_STATUS_SUCCESS)
+    {
+        fatx_error(fs, "failed to seek to directory entry\n");
+        return status;
+    }
+
+    /* Finally, mark the file as deleted. */
+    raw_dirent.filename_len = FATX_END_OF_DIR_MARKER;
+    items = fatx_dev_write(fs, &raw_dirent, sizeof(struct fatx_raw_directory_entry), 1);
+    if (items != 1)
+    {
+        fatx_error(fs, "failed to write directory entry\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
+ * Remove a directory entry.
+ */
+int fatx_unlink(struct fatx_fs *fs, char const *path)
+{
+    struct fatx_dirent entry, *result;
+    struct fatx_attr attr;
+    struct fatx_dir dir;
+    char path_buf[strlen(path)+1];
+    char *filename;
+    int status;
+
+    fatx_debug(fs, "fatx_unlink(path=\"%s\")\n", path);
+
+    /* Open the directory that contains this file. */
+    strcpy(path_buf, path);
+    status = fatx_open_dir(fs, fatx_dirname(path_buf), &dir);
+    if (status != FATX_STATUS_SUCCESS) return status;
+
+    strcpy(path_buf, path);
+    filename = fatx_basename(path_buf);
+
+    while (1)
+    {
+        status = fatx_read_dir(fs, &dir, &entry, &attr, &result);
+
+        if (status == FATX_STATUS_SUCCESS)
+        {
+            /* Is this the file we're looking for? */
+            if (strcmp(attr.filename, filename) == 0) break;
+        }
+        else if (status == FATX_STATUS_END_OF_DIR)
+        {
+            fatx_debug(fs, "reached end of dir\n");
+            status = FATX_STATUS_FILE_NOT_FOUND;
+            break;
+        }
+        else if (status == FATX_STATUS_FILE_DELETED)
+        {
+            /* Skip over the deleted file. */
+            fatx_debug(fs, "skipping over deleted file\n");
+        }
+        else
+        {
+            /* Error */
+            fatx_debug(fs, "error!\n");
+            break;
+        }
+
+        /* Seek to the directory entry. */
+        status = fatx_next_dir_entry(fs, &dir);
+        if (status != FATX_STATUS_SUCCESS) break;
+    }
+
+    if (status != FATX_STATUS_SUCCESS) goto cleanup;
+
+    fatx_debug(fs, "found file!\n");
+
+    /* Traverse the cluster chain, marking each cluster as available. */
+    status = fatx_free_cluster_chain(fs, attr.first_cluster);
+    if (status != FATX_STATUS_SUCCESS) goto cleanup;
+
+    status = fatx_mark_dir_entry_deleted(fs, &dir);
+    if (status != FATX_STATUS_SUCCESS) goto cleanup;
+
+cleanup:
+    fatx_close_dir(fs, &dir);
+    return status;
 }
