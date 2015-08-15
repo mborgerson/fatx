@@ -19,13 +19,6 @@
 
 #include "fatx_internal.h"
 
-/* The root directory is special in that it is the very first cluster, and it
- * cannot be indexed using the typical 2 index convention. It is always the
- * first cluster. When fatx_read_dir sees this in the cluster field of struct
- * fatx_dir, it will read from the root directory cluster.
- */
-#define FATX_ROOT_DIR_CLUSTER 0
-
 /*
  * Open a directory.
  */
@@ -85,7 +78,7 @@ int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir)
             else if (status == FATX_STATUS_FILE_DELETED)
             {
                 /* File deleted. Skip over it. */
-                continue;
+                goto continue_to_next_entry;
             }
             else if (status == FATX_STATUS_END_OF_DIR)
             {
@@ -104,7 +97,7 @@ int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir)
             if ((attr.attributes & FATX_ATTR_DIRECTORY) == 0)
             {
                 /* Not a directory. */
-                continue;
+                goto continue_to_next_entry;
             }
 
             /* Trim trailing slash, if present. */
@@ -121,15 +114,62 @@ int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir)
                 dir->entry = 0;
                 break;
             }
+
+            continue_to_next_entry:
+
+            /* Get the next directory entry. */
+            status = fatx_next_dir_entry(fs, dir);
+            if (status != FATX_STATUS_SUCCESS) break;
         }
     }
 
     return FATX_STATUS_SUCCESS;
 }
 
+/*
+ * Move to the next directory entry.
+ */
+int fatx_next_dir_entry(struct fatx_fs *fs, struct fatx_dir *dir)
+{
+    fatx_fat_entry fat_entry;
+    int status;
+
+    fatx_debug(fs, "fatx_next_dir_entry()\n");
+
+    dir->entry += 1;
+
+    if (dir->entry < fs->bytes_per_cluster/sizeof(struct fatx_raw_directory_entry))
+    {
+        /* Not the last possible entry at the end of the cluster. */
+        return FATX_STATUS_SUCCESS;
+    }
+
+    /* If we've reached this point, we need to find the next cluster, if any,
+     * that contains additional directory entries.
+     */
+    status = fatx_read_fat(fs, dir->cluster, &fat_entry);
+    if (status != FATX_STATUS_SUCCESS) return status;
+
+    switch (fatx_get_fat_entry_type(fs, fat_entry))
+    {
+    case FATX_CLUSTER_DATA:
+        dir->cluster = fat_entry;
+        dir->entry = 0;
+        fatx_info(fs, "found additional directory entries at cluster %zd\n", dir->cluster);
+        return FATX_STATUS_SUCCESS;
+
+    case FATX_CLUSTER_END:
+        fatx_error(fs, "got end of cluster before end of directory\n");
+        return FATX_STATUS_ERROR;
+
+    default:
+        fatx_error(fs, "expected another cluster with additional directory entries\n");
+        return FATX_STATUS_ERROR;
+    }
+}
 
 /*
- * Get the next directory entry.
+ * Read the current directory entry.
  *
  * dir should be the directory opened by a call to fatx_open_dir.
  * entry should be a pointer to an allocation of struct fatx_dirent.
@@ -139,68 +179,21 @@ int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir)
 int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *entry, struct fatx_attr *attr, struct fatx_dirent **result)
 {
     struct fatx_raw_directory_entry directory_entry;
-    int status;
     size_t items, offset;
-    fatx_fat_entry fat_entry;
+    int status;
 
     fatx_debug(fs, "fatx_read_dir(cluster=%zd, entry=%zd)\n", dir->cluster, dir->entry);
 
-    /* Was last entry at the end of the cluster? */
-    if (dir->entry >= fs->bytes_per_cluster/sizeof(struct fatx_raw_directory_entry))
-    {
-        fatx_debug(fs, "fatx_read_dir - reached last entry in dir, checking for "
-                       "additional cluster in FAT\n");
-
-        /* Yes. Check to see if there is another cluster. */
-        status = fatx_read_fat(fs, dir->cluster, &fat_entry);
-        if (status) return -1;
-
-        status = fatx_get_fat_entry_type(fs, fat_entry);
-
-        if (status == FATX_CLUSTER_DATA)
-        {
-            /* There is another cluster. Move to it. */
-            dir->cluster = fat_entry;
-            dir->entry = 0;
-        }
-        else if (status == FATX_CLUSTER_END)
-        {
-            /* This is the end of the cluster chain. Should have received a
-             * end-of-directory marker before this point. Directory or FAT may
-             * be corrupt.
-             */
-            fatx_error(fs, "did not get end of directory yet and there's no cluster to go to\n");
-            return FATX_STATUS_ERROR;
-        }
-        else
-        {
-            /* Error. */
-            fatx_error(fs, "expected another cluster\n");
-            return FATX_STATUS_ERROR;
-        }
-    }
-
-    /* Seek to directory entry. */
-    if (dir->cluster == FATX_ROOT_DIR_CLUSTER)
-    {
-        /* Root directory is desired. */
-        offset = fs->root_offset;
-    }
-    else
-    {
-        status = fatx_cluster_number_to_byte_offset(fs, dir->cluster, &offset);
-        if (status) return status;
-    }
-
-    offset += dir->entry * sizeof(struct fatx_raw_directory_entry);
-    status = fatx_dev_seek(fs, offset);
+    /* Seek to the current cluster. */
+    offset = dir->entry * sizeof(struct fatx_raw_directory_entry);
+    status = fatx_dev_seek_cluster(fs, dir->cluster, offset);
     if (status)
     {
         fatx_error(fs, "failed to seek to directory entry\n");
         return FATX_STATUS_ERROR;
     }
 
-    /* Get the real directory entry. */
+    /* Read in the raw directory entry. */
     items = fatx_dev_read(fs, &directory_entry, sizeof(struct fatx_raw_directory_entry), 1);
     if (items != 1)
     {
@@ -212,7 +205,7 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
     if (directory_entry.filename_len == FATX_END_OF_DIR_MARKER)
     {
         /* End of directory. */
-        fatx_debug(fs, "got end of dir\n");
+        fatx_debug(fs, "reached the end of the directory\n");
         *result = NULL;
         return FATX_STATUS_END_OF_DIR;
     }
@@ -221,12 +214,11 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
     if (directory_entry.filename_len == FATX_DELETED_FILE_MARKER)
     {
         /* This directory entry is no longer in use. */
-        fatx_debug(fs, "dirent %zd is a deleted file\n", dir->entry);
-        dir->entry += 1;
+        fatx_debug(fs, "dirent %zd of cluster %zd is a deleted file\n", dir->entry, dir->cluster);
         return FATX_STATUS_FILE_DELETED;
     }
 
-    fatx_debug(fs, "dirent %zd first cluster is %d\n", dir->entry, directory_entry.first_cluster);
+    fatx_debug(fs, "dirent %zd of cluster %zd data starts at %d\n", dir->entry, dir->cluster, directory_entry.first_cluster);
 
     /* Copy filename. */
     memcpy(entry->filename, directory_entry.filename, directory_entry.filename_len);
@@ -244,7 +236,6 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
     }
 
     *result = entry;
-    dir->entry += 1;
     return FATX_STATUS_SUCCESS;
 }
 

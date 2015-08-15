@@ -69,3 +69,12 @@ size_t fatx_dev_read(struct fatx_fs *fs, void *buf, size_t size, size_t items)
     fatx_debug(fs, "fatx_dev_read(buf=0x%p, size=0x%zx, items=0x%zx)\n", buf, size, items);
     return fread(buf, size, items, fs->device);
 }
+
+/*
+ * Write to the device.
+ */
+size_t fatx_dev_write(struct fatx_fs *fs, void *buf, size_t size, size_t items)
+{
+    fatx_debug(fs, "fatx_dev_write(buf=0x%p, size=0x%zx, items=0x%zx)\n", buf, size, items);
+    return fwrite(buf, size, items, fs->device);
+}

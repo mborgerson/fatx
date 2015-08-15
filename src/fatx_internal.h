@@ -51,6 +51,13 @@
 /* Default number of bytes per sector. */
 #define FATX_BYTES_PER_SECTOR        512
 
+/* The root directory is special in that it is the very first cluster, and it
+ * cannot be indexed using the typical 2 index convention. It is always the
+ * first cluster. When fatx_read_dir sees this in the cluster field of struct
+ * fatx_dir, it will read from the root directory cluster.
+ */
+#define FATX_ROOT_DIR_CLUSTER 0
+
 /* Markers used in the filename_size field of the directory entry. */
 #define FATX_DELETED_FILE_MARKER     0xe5
 #define FATX_END_OF_DIR_MARKER       0xff
@@ -124,16 +131,20 @@ int fatx_process_superblock(struct fatx_fs *fs);
 int fatx_dev_seek(struct fatx_fs *fs, off_t offset);
 int fatx_dev_seek_cluster(struct fatx_fs *fs, size_t cluster, off_t offset);
 size_t fatx_dev_read(struct fatx_fs *fs, void *buf, size_t size, size_t items);
+size_t fatx_dev_write(struct fatx_fs *fs, void *buf, size_t size, size_t items);
 
 /* FAT Functions */
 int fatx_read_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry *entry);
+int fatx_write_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry entry);
 int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, size_t *offset);
 int fatx_get_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_entry *fat_entry);
+int fatx_set_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_entry fat_entry);
 int fatx_get_fat_entry_type(struct fatx_fs *fs, fatx_fat_entry entry);
 int fatx_get_next_cluster(struct fatx_fs *fs, size_t *cluster);
+int fatx_mark_cluster_available(struct fatx_fs *fs, size_t cluster);
 
 /* Directory Functions */
-int fatx_read_dir_ll(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_raw_directory_entry *dirent, struct fatx_raw_directory_entry **nextdirent);
+int fatx_next_directory_entry(struct fatx_fs *fs, struct fatx_dir *dir);
 int fatx_dirent_to_attr(struct fatx_fs *fs, struct fatx_raw_directory_entry *entry, struct fatx_attr *attr);
 
 /* Misc Functions */

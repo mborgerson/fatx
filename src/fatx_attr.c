@@ -90,8 +90,7 @@ int fatx_get_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr)
         }
         else if (status == FATX_STATUS_FILE_DELETED)
         {
-            /* Read a deleted file entry. Skip over it. */
-            continue;
+            /* Read a deleted file entry. Skip over it... */
         }
         else if (status == FATX_STATUS_END_OF_DIR)
         {
@@ -105,8 +104,13 @@ int fatx_get_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr)
             status = FATX_STATUS_ERROR;
             break;
         }
+
+        /* Get the next directory entry. */
+        status = fatx_next_dir_entry(fs, &dir);
+        if (status != FATX_STATUS_SUCCESS) break;
     }
 
     fatx_close_dir(fs, &dir);
     return status;
 }
+

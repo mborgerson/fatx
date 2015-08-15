@@ -84,6 +84,27 @@ int fatx_get_path_component(char const *path, size_t component, char const **sta
 }
 
 /*
+ * Get length of the directory part of path.
+ *
+ * Given a path such as: /path/to/file
+ * Return the length of the string: /path/to/
+ */
+int fatx_get_dirname_len(char const *path)
+{
+    /* TODO */
+    return 0;
+}
+
+/*
+ * Get the starting character position of the filename from a path.
+ */
+int fatx_get_basename_index(char const *path)
+{
+    /* TODO */
+    return 0;
+}
+
+/*
  * Unpack a FATX date.
  */
 int fatx_unpack_date(uint16_t in, struct fatx_ts *out)

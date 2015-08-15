@@ -22,7 +22,6 @@ project(fatxfs)
 find_package(PkgConfig)
 pkg_search_module(FUSE REQUIRED fuse)
 
-
 set(LIBFATXFS_SOURCES "")
 set(FATXFS_SOURCES    "")
 add_subdirectory(${CMAKE_SOURCE_DIR}/src)

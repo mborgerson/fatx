@@ -84,6 +84,7 @@ struct fatx_fuse_private_data *fatx_fuse_get_private_data(void);
 int fatx_fuse_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size);
 void fatx_fuse_print_usage(void);
 void fatx_fuse_print_version(void);
+int fatx_fuse_unlink(char const *path);
 
 /* Define the operations supported by this filesystem */
 static struct fuse_operations fatx_fuse_oper = {
@@ -93,8 +94,12 @@ static struct fuse_operations fatx_fuse_oper = {
     .read    = fatx_fuse_read,
     .init    = fatx_fuse_init,
     .destroy = fatx_fuse_destroy,
+    .unlink  = fatx_fuse_unlink,
 };
 
+/*
+ * Simple convenince function to get the private data struct.
+ */
 struct fatx_fuse_private_data *fatx_fuse_get_private_data(void)
 {
     struct fuse_context *context;
@@ -137,9 +142,15 @@ void *fatx_fuse_init(struct fuse_conn_info *conn)
 void fatx_fuse_destroy(void *data)
 {
     struct fatx_fuse_private_data *pd = data;
+
     fatx_close_device(pd->fs);
     free(pd->fs);
     pd->fs = NULL;
+
+    if (pd->log_handle)
+    {
+        fclose(pd->log_handle);
+    }
 }
 
 /*
@@ -165,7 +176,7 @@ int fatx_fuse_read_dir(const char *path, void *buf, fuse_fill_dir_t filler, off_
     /* Iterate over directory entries, calling filler() for each. */
     while (1)
     {
-        /* Get the next directory entry. */
+        /* Get the current directory entry. */
         status = fatx_read_dir(pd->fs, &dir, &dirent, &attr, &nextdirent);
 
         if (status == FATX_STATUS_SUCCESS)
@@ -182,8 +193,7 @@ int fatx_fuse_read_dir(const char *path, void *buf, fuse_fill_dir_t filler, off_
         }
         else if (status == FATX_STATUS_FILE_DELETED)
         {
-            /* File deleted. Skip over it. */
-            continue;
+            /* File deleted. Skip over it... */
         }
         else if (status == FATX_STATUS_END_OF_DIR)
         {
@@ -196,6 +206,10 @@ int fatx_fuse_read_dir(const char *path, void *buf, fuse_fill_dir_t filler, off_
             /* Error */
             break;
         }
+
+        /* Get the next directory entry. */
+        status = fatx_next_dir_entry(pd->fs, &dir);
+        if (status != FATX_STATUS_SUCCESS) break;
     }
 
     fatx_close_dir(pd->fs, &dir);
@@ -305,6 +319,33 @@ int fatx_fuse_read(const char *path, char *buf, size_t size, off_t offset, struc
     fatx_debug(pd->fs, "fatx_fuse_read(path=\"%s\", buf=0x%p, size=0x%zx, offset=0x%zx)\n", path, (void*)buf, size, offset);
 
     return fatx_read(pd->fs, path, offset, size, buf);
+}
+
+/*
+ * Remove a file.
+ */
+int fatx_fuse_unlink(char const *path)
+{
+    struct fatx_fuse_private_data *pd;
+    int status;
+
+    pd = fatx_fuse_get_private_data();
+    if (pd == NULL) return -1;
+
+    fatx_debug(pd->fs, "fatx_fuse_unlink(path=\"%s\")\n", path);
+    status = fatx_unlink(pd->fs, path);
+
+    switch (status)
+    {
+    case FATX_STATUS_SUCCESS:
+        return 0;
+
+    case FATX_STATUS_FILE_NOT_FOUND:
+        return -ENOENT;
+
+    default:
+        return -1;
+    }
 }
 
 /*

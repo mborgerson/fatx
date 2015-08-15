@@ -94,14 +94,16 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
 int fatx_close_device(struct fatx_fs *fs);
 int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir);
 int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *entry, struct fatx_attr *attr, struct fatx_dirent **result);
+int fatx_next_dir_entry(struct fatx_fs *fs, struct fatx_dir *dir);
 int fatx_close_dir(struct fatx_fs *fs, struct fatx_dir *dir);
 int fatx_get_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr);
+int fatx_set_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr);
 int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, void *buf);
+int fatx_unlink(struct fatx_fs *fs, char const *path);
 
 #if 0
 int fatx_create(struct fatx_fs *fs, char const *path);
 int fatx_truncate(struct fatx_fs *fs);
-int fatx_unlink(struct fatx_fs *fs, char const *path);
 int fatx_write(struct fatx_fs *fs, char const *path, size_t offset, size_t size, void *buf);
 int fatx_set_attr(struct fatx_fs *fs, char const *path);
 #endif
