@@ -1,8 +1,10 @@
 fatxfs
 ======
-**fatxfs** is a userspace filesystem driver for the FATX filesystem, a varient
+`fatxfs` is a userspace filesystem driver for the FATX filesystem, a varient
 of FAT16/32 developed by Microsoft for the original Xbox console.
 
+Status
+------
 Currently `fatxfs` provides only read access. Write functionality is in the
 works.
 
@@ -29,7 +31,8 @@ Assuming you have homebrew installed, install `pkgconfig` and `cmake`:
     $ brew install install pkgconfig cmake
 
 Install FUSE for OS X:
-* Download the latest FUSE DMG image file at the [FUSE for OS X homepage](https://osxfuse.github.io/).
+* Download the latest FUSE DMG image file at the [FUSE for OS X
+  homepage](https://osxfuse.github.io/).
 * Mount the DMG and run the installer.
 * Restart your system.
 
@@ -50,8 +53,9 @@ Finally, start the build:
 
 How to Use
 ----------
-Firstly, you will need an image or block device to mount. Then, you can simply
-create a mountpoint and mount the "C drive" (default behavior). For example:
+Firstly, you will need a raw disk image or block device to mount. Then, you can
+simply create a mountpoint and mount the "C drive" (default behavior). For
+example:
 
     $ mkdir c_drive
     $ ./fatxfs /dev/nbd0 c_drive
@@ -67,17 +71,18 @@ Or, you can specify the offset and size of the partition manually:
 
 Tips
 ----
-### Mounting a QCOW2 Image
-If you have a qcow image, you can mount the qcow image as a network block device
-before mounting a partition on the device:
+### Mounting a qcow Image
+If your disk image is a [qcow](https://en.wikipedia.org/wiki/Qcow) image, you
+can mount it as a network block device before mounting a partition on the
+device:
 
     $ sudo apt-get install qemu-utils
     $ sudo modprobe nbd max_part=8
     $ sudo qemu-nbd --connect=/dev/nbd0 /path/to/your/image.qcow2
     $ sudo chmod a+rwx /dev/nbd0
 
-Unfortunately, on OS X, there is not a way to mount a qcow image like this.
-I recommend converting the qcow image to a raw disk image.
+Unfortunately, on OS X, there is not a way to mount a qcow image like this
+(AFAIK). I recommend converting the qcow image to a raw disk image.
 
     $ qemu-img convert /path/to/image.qcow /path/to/output.raw
 
