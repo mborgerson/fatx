@@ -165,3 +165,12 @@ int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, v
 
     return total_bytes_read;
 }
+
+/*
+ * Create a file.
+ */
+int fatx_mknod(struct fatx_fs *fs, char const *path)
+{
+    fatx_debug(fs, "fatx_mknod(path=\"%s\")\n", path);
+    return FATX_STATUS_ERROR;
+}

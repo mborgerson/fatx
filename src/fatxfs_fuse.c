@@ -72,28 +72,43 @@ struct fatx_fuse_private_data {
     int             log_level;
 };
 
-void *fatx_fuse_init(struct fuse_conn_info *conn);
-void fatx_fuse_destroy(void *data);
-int fatx_fuse_read_dir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi);
+/*
+ * Filesystem operation functions.
+ */
 int fatx_fuse_get_attr(const char *path, struct stat *stbuf);
+int fatx_fuse_mkdir(const char *path, mode_t mode);
+int fatx_fuse_mknod(const char *path, mode_t mode, dev_t dev);
 int fatx_fuse_open(const char *path, struct fuse_file_info *fi);
 int fatx_fuse_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
+int fatx_fuse_read_dir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi);
+int fatx_fuse_unlink(char const *path);
+void *fatx_fuse_init(struct fuse_conn_info *conn);
+void fatx_fuse_destroy(void *data);
+
+/*
+ * Command line processing functions.
+ */
 char const *fatx_fuse_opt_consume_key(char const *arg);
 int fatx_fuse_opt_proc(void *data, const char *arg, int key, struct fuse_args *outargs);
+
+/*
+ * Helper functions.
+ */
 struct fatx_fuse_private_data *fatx_fuse_get_private_data(void);
 int fatx_fuse_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size);
 void fatx_fuse_print_usage(void);
 void fatx_fuse_print_version(void);
-int fatx_fuse_unlink(char const *path);
 
 /* Define the operations supported by this filesystem */
 static struct fuse_operations fatx_fuse_oper = {
+    .destroy = fatx_fuse_destroy,
     .getattr = fatx_fuse_get_attr,
-    .readdir = fatx_fuse_read_dir,
+    .init    = fatx_fuse_init,
+    .mkdir   = fatx_fuse_mkdir,
+    .mknod   = fatx_fuse_mknod,
     .open    = fatx_fuse_open,
     .read    = fatx_fuse_read,
-    .init    = fatx_fuse_init,
-    .destroy = fatx_fuse_destroy,
+    .readdir = fatx_fuse_read_dir,
     .unlink  = fatx_fuse_unlink,
 };
 
@@ -349,6 +364,43 @@ int fatx_fuse_unlink(char const *path)
 }
 
 /*
+ * Create a directory.
+ */
+int fatx_fuse_mkdir(const char *path, mode_t mode)
+{
+    struct fatx_fuse_private_data *pd;
+    int status;
+
+    pd = fatx_fuse_get_private_data();
+    if (pd == NULL) return -1;
+
+    fatx_debug(pd->fs, "fatx_fuse_mkdir(path=\"%s\", mode=0%o)\n", path, mode);
+
+    status = fatx_mkdir(pd->fs, path);
+
+    return status;
+}
+
+/*
+ * Create a file.
+ */
+int fatx_fuse_mknod(const char *path, mode_t mode, dev_t dev)
+{
+    struct fatx_fuse_private_data *pd;
+    int status;
+
+    pd = fatx_fuse_get_private_data();
+    if (pd == NULL) return -1;
+
+    fatx_debug(pd->fs, "fatx_fuse_mknod(path=\"%s\", mode=0%o, dev=0x%x)\n", path, mode, dev);
+
+    status = fatx_mknod(pd->fs, path);
+
+    return status;
+}
+
+
+/*
  * Given a string of the form --key=value, return a pointer discarding --key=.
  */
 char const *fatx_fuse_opt_consume_key(char const *arg)
@@ -578,6 +630,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "failed to open %s for writing\n", pd.log_path);
             goto error;
         }
+        setbuf(pd.log_handle, NULL);
         fatx_log_init(pd.fs, pd.log_handle, pd.log_level);
     }
 

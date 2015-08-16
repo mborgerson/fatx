@@ -366,3 +366,12 @@ cleanup:
     fatx_close_dir(fs, &dir);
     return status;
 }
+
+/*
+ * Create a directory.
+ */
+int fatx_mkdir(struct fatx_fs *fs, char const *path)
+{
+    fatx_debug(fs, "fatx_mkdir(path=\"%s\")\n", path);
+    return FATX_STATUS_ERROR;
+}

@@ -104,7 +104,7 @@ int fatx_get_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_
     }
 
     status = fatx_read_fat(fs, cluster, fat_entry);
-    if (status)
+    if (status != FATX_STATUS_SUCCESS)
     {
         /* An error occured. */
         return status;
@@ -129,7 +129,7 @@ int fatx_set_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_
     }
 
     status = fatx_write_fat(fs, cluster, fat_entry);
-    if (status)
+    if (status != FATX_STATUS_SUCCESS)
     {
         /* An error occured. */
         return status;
@@ -223,7 +223,7 @@ int fatx_get_next_cluster(struct fatx_fs *fs, size_t *cluster)
     fatx_fat_entry fat_entry;
 
     status = fatx_read_fat(fs, *cluster, &fat_entry);
-    if (status)
+    if (status != FATX_STATUS_SUCCESS)
     {
         fatx_error(fs, "read_fat returned status=%d, fat_entry = 0x%x\n", status, fat_entry);
         return status;
@@ -246,6 +246,23 @@ int fatx_mark_cluster_available(struct fatx_fs *fs, size_t cluster)
 {
     fatx_debug(fs, "fatx_mark_cluster_available(cluster=%zd)\n", cluster);
     fatx_set_fat_entry_for_cluster(fs, cluster, 0);
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
+ * Mark a given cluster as the end of a chain.
+ */
+int fatx_mark_cluster_end(struct fatx_fs *fs, size_t cluster)
+{
+    fatx_debug(fs, "fatx_mark_cluster_end(cluster=%zd)\n", cluster);
+    if (fs->fat_type == FATX_FAT_TYPE_16)
+    {
+        fatx_set_fat_entry_for_cluster(fs, cluster, 0xffff);
+    }
+    else
+    {
+        fatx_set_fat_entry_for_cluster(fs, cluster, 0x0fffffff);
+    }
     return FATX_STATUS_SUCCESS;
 }
 
@@ -279,4 +296,70 @@ int fatx_free_cluster_chain(struct fatx_fs *fs, size_t first_cluster)
     } while (cluster);
 
     return FATX_STATUS_SUCCESS;
+}
+
+/*
+ * Find an available cluster.
+ */
+int fatx_alloc_cluster(struct fatx_fs *fs, size_t *cluster)
+{
+    int status;
+    fatx_fat_entry fat_entry;
+    size_t i;
+
+    fatx_debug(fs, "fatx_alloc_cluster()\n");
+
+    for (i=0; 1; i++)
+    {
+        status = fatx_get_fat_entry_for_cluster(fs, i, &fat_entry);
+        if (status != FATX_STATUS_SUCCESS)
+        {
+            fatx_error(fs, "fatx_get_fat_entry_for_cluster returned status=%d, fat_entry = 0x%x\n", status, fat_entry);
+            return status;
+        }
+
+        status = fatx_get_fat_entry_type(fs, fat_entry);
+        if (status == FATX_CLUSTER_AVAILABLE)
+        {
+            /* Found a free cluster! */
+            break;
+        }
+    }
+
+    status = fatx_mark_cluster_end(fs, i);
+    if (status != FATX_STATUS_SUCCESS) return status;
+
+    *cluster = i;
+
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
+ * Add a cluster to a chain.
+ */
+int fatx_attach_cluster(struct fatx_fs *fs, size_t tail, size_t cluster)
+{
+    int status;
+    fatx_fat_entry fat_entry;
+
+    fatx_debug(fs, "fatx_attach_cluster(tail=%zd, cluster=%zd)\n", tail, cluster);
+
+    status = fatx_get_fat_entry_for_cluster(fs, tail, &fat_entry);
+    if (status != FATX_STATUS_SUCCESS)
+    {
+        fatx_error(fs, "fatx_get_fat_entry_for_cluster returned status=%d, fat_entry = 0x%x\n", status, fat_entry);
+        return status;
+    }
+
+    status = fatx_get_fat_entry_type(fs, fat_entry);
+    if (status != FATX_CLUSTER_END)
+    {
+        fatx_error(fs, "tail was not the last cluster in the chain\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    fatx_set_fat_entry_for_cluster(fs, tail, cluster);
+    fatx_mark_cluster_end(fs, cluster);
+
+    return FATX_STATUS_ERROR;
 }
