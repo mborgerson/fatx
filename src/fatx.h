@@ -20,7 +20,7 @@
 #ifndef FATX_H
 #define FATX_H
 
-#define _XOPEN_SOURCE
+#define _XOPEN_SOURCE 500
 
 #include <stdint.h>
 #include <stdio.h>
