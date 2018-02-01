@@ -14,8 +14,19 @@ Currently targeting:
 * Linux-based systems, specifically Ubuntu 14.04, and
 * OS X 10.10.
 
-How to Build
-------------
+
+Build via Docker
+----------------
+fatxfs can be easily built inside a [Docker](https://www.docker.com/)
+container. If you use this method, you can skip the prerequisites and
+build instructions below.
+
+    $ docker build -t fatxfs https://raw.githubusercontent.com/mborgerson/fatx/master/Dockerfile
+    $ docker run -it --rm fatxfs
+    # fatxfs --help
+
+How to Build (Natively)
+-----------------------
 ### Prerequisites
 
 #### Ubuntu
