@@ -75,6 +75,8 @@
 #define FATX_DATE_TO_YEAR(d)         ((((d)>>9)&0x7f)+FATX_EPOCH)
 #define FATX_DATE_TO_MONTH(d)        (((d)>>5)&0xf)
 #define FATX_DATE_TO_DAY(d)          ((d)&0x1f)
+#define FATX_DATE(d, m, y)           ((d&0x1f) | ((m&0xf) << 5) | (((y - FATX_EPOCH)&0x7f) << 9))
+#define FATX_TIME(h, m, s)           (((h&0xf) << 11) | ((m&0x1f) << 5) | ((s / 2)&0x1f))
 
 /* Default seperator. */
 #define FATX_PATH_SEPERATOR          '/'
@@ -131,7 +133,7 @@ int fatx_process_superblock(struct fatx_fs *fs);
 int fatx_dev_seek(struct fatx_fs *fs, off_t offset);
 int fatx_dev_seek_cluster(struct fatx_fs *fs, size_t cluster, off_t offset);
 size_t fatx_dev_read(struct fatx_fs *fs, void *buf, size_t size, size_t items);
-size_t fatx_dev_write(struct fatx_fs *fs, void *buf, size_t size, size_t items);
+size_t fatx_dev_write(struct fatx_fs *fs, const void *buf, size_t size, size_t items);
 
 /* FAT Functions */
 int fatx_read_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry *entry);
@@ -149,12 +151,16 @@ int fatx_attach_cluster(struct fatx_fs *fs, size_t tail, size_t cluster);
 
 /* Directory Functions */
 int fatx_dirent_to_attr(struct fatx_fs *fs, struct fatx_raw_directory_entry *entry, struct fatx_attr *attr);
+int fatx_attr_to_dirent(struct fatx_fs *fs, struct fatx_attr *attr, struct fatx_raw_directory_entry *entry);
 int fatx_mark_dir_entry_deleted(struct fatx_fs *fs, struct fatx_dir *dir);
+int fatx_mark_end_of_dir(struct fatx_fs *fs, struct fatx_dir *dir);
 
 /* Misc Functions */
 int fatx_get_path_component(char const *path, size_t component, char const **start, size_t *len);
 int fatx_unpack_date(uint16_t in, struct fatx_ts *out);
 int fatx_unpack_time(uint16_t in, struct fatx_ts *out);
+int fatx_pack_date(struct fatx_ts *in, uint16_t *out);
+int fatx_pack_time(struct fatx_ts *in, uint16_t *out);
 char *fatx_dirname(char *path);
 char *fatx_basename(char *path);
 
