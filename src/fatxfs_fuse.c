@@ -403,15 +403,7 @@ int fatx_fuse_mkdir(const char *path, mode_t mode)
     fatx_debug(pd->fs, "fatx_fuse_mkdir(path=\"%s\", mode=0%o)\n", path, mode);
 
     status = fatx_mkdir(pd->fs, path);
-
-    switch (status)
-    {
-    case FATX_STATUS_SUCCESS:
-        return 0;
-    case FATX_STATUS_ERROR:
-    default:
-        return -1;
-    }
+    return (status == FATX_STATUS_SUCCESS ? 0 : -1);
 }
 
 /*
@@ -454,14 +446,7 @@ int fatx_fuse_mknod(const char *path, mode_t mode, dev_t dev)
     fatx_debug(pd->fs, "fatx_fuse_mknod(path=\"%s\", mode=0%o, dev=0x%x)\n", path, mode, dev);
 
     status = fatx_mknod(pd->fs, path);
-    switch (status)
-    {
-    case FATX_STATUS_SUCCESS:
-        return 0;
-    case FATX_STATUS_ERROR:
-    default:
-        return -1;
-    }
+    return (status == FATX_STATUS_SUCCESS ? 0 : -1);
 }
 
 /*
@@ -478,14 +463,7 @@ int fatx_fuse_truncate(const char *path, off_t size)
     fatx_debug(pd->fs, "fatx_fuse_truncate(path=\"%s\", size=0x%x)\n", path, size);
 
     status = fatx_truncate(pd->fs, path, size);
-    switch (status)
-    {
-    case FATX_STATUS_SUCCESS:
-        return 0;
-    case FATX_STATUS_ERROR:
-    default:
-        return -1;
-    }
+    return (status == FATX_STATUS_SUCCESS ? 0 : -1);
 }
 
 /*
@@ -502,14 +480,7 @@ int fatx_fuse_rename(const char *from, const char *to)
     fatx_debug(pd->fs, "fatx_fuse_rename(from=\"%s\", to=\"%s\")\n", from, to);
 
     status = fatx_rename(pd->fs, from, to);
-    switch (status)
-    {
-    case FATX_STATUS_SUCCESS:
-        return 0;
-    case FATX_STATUS_ERROR:
-    default:
-        return -1;
-    }
+    return (status == FATX_STATUS_SUCCESS ? 0 : -1);
 }
 
 /*
@@ -528,14 +499,7 @@ int fatx_fuse_utimens(const char *path, const struct timespec ts[2])
     fatx_time_t_to_fatx_ts(ts[1].tv_sec, &(time[1]));
 
     status = fatx_utime(pd->fs, path, time);
-    switch (status)
-    {
-    case FATX_STATUS_SUCCESS:
-        return 0;
-    case FATX_STATUS_ERROR:
-    default:
-        return -1;
-    }
+    return (status == FATX_STATUS_SUCCESS ? 0 : -1);
 }
 
 /*

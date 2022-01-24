@@ -468,9 +468,16 @@ int fatx_create_dirent(struct fatx_fs *fs, char const *path, struct fatx_dir *di
     size_t cluster;
     time_t curtime;
 
-    /* Prepare filename */
+    /* Check basename is not too long */
     strcpy(path_buf, path);
     filename = fatx_basename(path_buf);
+    if (strlen(filename) >= FATX_MAX_FILENAME_LEN)
+    {
+        fatx_error(fs, "filename is too long\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    /* Prepare filename */
     strcpy(entry.filename, filename);
     strcpy(attr.filename, filename);
 

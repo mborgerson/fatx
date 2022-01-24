@@ -42,7 +42,7 @@ int fatx_find_cluster_for_file_offset_alloc(struct fatx_fs *fs, struct fatx_attr
 
     while (offset >= fs->bytes_per_cluster)
     {
-        fatx_error(fs, "seeking... cluster = %zx\n", cluster);
+        fatx_debug(fs, "seeking... cluster = %zx\n", cluster);
 
         /*
          * There is at least one more cluster.
@@ -168,10 +168,10 @@ int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, v
         }
 
         /* Move to next cluster? */
-        fatx_error(fs, "cluster offset = %zx\n", cluster_offset);
+        fatx_debug(fs, "cluster offset = %zx\n", cluster_offset);
         if (cluster_offset >= fs->bytes_per_cluster)
         {
-            fatx_error(fs, "looking for next cluster...\n");
+            fatx_debug(fs, "looking for next cluster...\n");
             status = fatx_get_next_cluster(fs, &cluster);
             if (status)
             {
@@ -270,14 +270,14 @@ int fatx_write(struct fatx_fs *fs, char const *path, off_t offset, size_t size, 
         }
 
         /* Move to next cluster? */
-        fatx_error(fs, "cluster offset = %zx\n", cluster_offset);
+        fatx_debug(fs, "cluster offset = %zx\n", cluster_offset);
         if (cluster_offset >= fs->bytes_per_cluster)
         {
-            fatx_error(fs, "looking for next cluster...\n");
+            fatx_debug(fs, "looking for next cluster...\n");
             status = fatx_get_next_cluster(fs, &cluster);
             if (status)
             {
-                fatx_error(fs, "EOF, allocating new cluster\n");
+                fatx_debug(fs, "EOF, allocating new cluster\n");
 
                 size_t new_cluster;
                 status = fatx_alloc_cluster(fs, &new_cluster);
@@ -359,8 +359,9 @@ int fatx_truncate(struct fatx_fs *fs, char const *path, off_t offset)
     while (enc_clusters * fs->bytes_per_cluster < offset)
     {
         status = fatx_get_next_cluster(fs, &cluster);
-        if (status == FATX_STATUS_ERROR) // Out of clusters, alloc more
+        if (status == FATX_STATUS_ERROR)
         {
+            /* Out of clusters, alloc more */
             size_t new_cluster;
             status = fatx_alloc_cluster(fs, &new_cluster);
             if (status) return status;
@@ -371,8 +372,9 @@ int fatx_truncate(struct fatx_fs *fs, char const *path, off_t offset)
             cluster = new_cluster;
             ++enc_clusters;
         }
-        else if (status == FATX_STATUS_SUCCESS) // Found next cluster, continue
+        else if (status == FATX_STATUS_SUCCESS)
         {
+            /* Found next cluster, continue */
             ++enc_clusters;
         }
         else return status;
@@ -407,13 +409,13 @@ int fatx_rename(struct fatx_fs *fs, char const *from, char const *to)
     fatx_debug(fs, "fatx_rename(from=\"%s\", to=\"%s\")\n", from, to);
 
     struct fatx_attr attr;
-    char from_path[FATX_MAX_FILENAME_LEN+1], to_path[FATX_MAX_FILENAME_LEN+1];
+    char from_path[strlen(from)+1], to_path[strlen(to)+1], *to_base;
     int status;
 
     /* Sanity check that we're not trying to move the file */
     strcpy(from_path, from);
     strcpy(to_path, to);
-    if(strcmp(fatx_dirname(from_path), fatx_dirname(to_path)) != 0)
+    if (strcmp(fatx_dirname(from_path), fatx_dirname(to_path)) != 0)
     {
         fatx_error(fs, "rename directories do not match\n");
         return FATX_STATUS_ERROR;
@@ -423,9 +425,17 @@ int fatx_rename(struct fatx_fs *fs, char const *from, char const *to)
     status = fatx_get_attr(fs, from, &attr);
     if (status) return status;
 
-    /* Rename the file, reusing to_path */
+    /* Check that the new filename is not too long */
     strcpy(to_path, to);
-    strcpy(attr.filename, fatx_basename(to_path));
+    to_base = fatx_basename(to_path);
+    if (strlen(to_base) >= FATX_MAX_FILENAME_LEN)
+    {
+        fatx_error(fs, "destination name too long\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    /* Rename the file */
+    strcpy(attr.filename, to_base);
 
     /* Save new attributes */
     return fatx_set_attr(fs, from, &attr);
