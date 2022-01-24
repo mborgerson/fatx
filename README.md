@@ -10,10 +10,7 @@ works.
 
 Platform Support
 ----------------
-Currently targeting:
-* Linux-based systems, specifically Ubuntu 14.04, and
-* OS X 10.10.
-
+Works on Linux and macOS. Other platform support is possible, but untested.
 
 Build via Docker
 ----------------
@@ -21,7 +18,8 @@ fatxfs can be easily built inside a [Docker](https://www.docker.com/)
 container. If you use this method, you can skip the prerequisites and
 build instructions below.
 
-    $ docker build -t fatxfs https://raw.githubusercontent.com/mborgerson/fatx/master/Dockerfile
+    $ git clone https://github.com/mborgerson/fatx
+    $ docker build -t fatxfs .
     $ docker run -it --rm fatxfs
     # fatxfs --help
 
@@ -39,13 +37,7 @@ Download Xcode (available from the App Store) to get command line tools.
 
 Assuming you have homebrew installed, install `pkgconfig` and `cmake`:
 
-    $ brew install install pkgconfig cmake
-
-Install FUSE for OS X:
-* Download the latest FUSE DMG image file at the [FUSE for OS X
-  homepage](https://osxfuse.github.io/).
-* Mount the DMG and run the installer.
-* Restart your system.
+    $ brew install install pkgconfig cmake macfuse
 
 ### Download Source
 Clone the repository:
