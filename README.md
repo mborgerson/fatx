@@ -20,8 +20,10 @@ build instructions below.
 
     $ git clone https://github.com/mborgerson/fatx
     $ docker build -t fatxfs .
-    $ docker run -it --rm fatxfs
-    # fatxfs --help
+    $ docker run -it --rm -v $PWD:/work -w /work --device /dev/fuse --privileged fatxfs
+    # mkdir c
+    # fatxfs xbox.img c
+    # ls c
 
 How to Build (Natively)
 -----------------------
