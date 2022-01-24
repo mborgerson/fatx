@@ -1,0 +1,44 @@
+name: Build
+
+on:
+  push:
+    paths-ignore:
+      - '.github/**'
+      - '!.github/workflows/**'
+      - 'README.md'
+  pull_request:
+    paths-ignore:
+      - '.github/**'
+      - '!.github/workflows/**'
+      - 'README.md'
+
+jobs:
+  BuildUbuntu:
+    name: Build on Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy \
+            build-essential pkg-config libfuse-dev cmake git
+      - name: Build
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          make install
+  BuildDocker:
+    name: Build Docker image on Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Build
+        run: docker build -t fatx .
