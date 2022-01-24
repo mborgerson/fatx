@@ -42,3 +42,22 @@ jobs:
           fetch-depth: 0
       - name: Build
         run: docker build -t fatx .
+  BuildMacos:
+    name: Build on macOS
+    runs-on: macos-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        run: |
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          export HOMEBREW_NO_INSTALL_CLEANUP=1
+          brew install pkgconfig cmake macfuse
+      - name: Build
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          make install
