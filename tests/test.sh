@@ -1,6 +1,24 @@
 #!/bin/bash
 set -ex
+
+function checksum {
+	sha256sum $1 | cut -f1 -d' '
+}
+
 tar xvf xbox_hdd.img.tgz
 mkdir -p c
 fatxfs xbox_hdd.img c
-sha256sum -c expected_sha256.txt
+[[ $(checksum c/xboxdash.xbe) = "338e6e203d9f1db5f2c1d976b8969af42049c32e1a65ac0347fbc6efcf5bd7c6" ]]
+
+# Copy a file in
+SRC_PATH=$(which fatxfs)
+DST_PATH="c/a/b/c/d/randfile.bin"
+
+mkdir -p $(dirname $DST_PATH)
+cp $SRC_PATH $DST_PATH
+fusermount -u c
+
+# Mount and verify contents
+fatxfs xbox_hdd.img c
+[[ $(checksum $DST_PATH) = $(checksum $SRC_PATH) ]]
+fusermount -u c
