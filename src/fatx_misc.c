@@ -22,6 +22,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <libgen.h>
+#include <time.h>
 
 /*
  * Get the specified path component.
@@ -124,6 +125,15 @@ char *fatx_basename(char *path)
 }
 
 /*
+ * Pack a FATX date.
+ */
+int fatx_pack_date(struct fatx_ts *in, uint16_t *out)
+{
+    *out = FATX_DATE(in->day, in->month, in->year);;
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
  * Unpack a FATX date.
  */
 int fatx_unpack_date(uint16_t in, struct fatx_ts *out)
@@ -131,6 +141,15 @@ int fatx_unpack_date(uint16_t in, struct fatx_ts *out)
     out->year  = FATX_DATE_TO_YEAR(in);
     out->month = FATX_DATE_TO_MONTH(in);
     out->day   = FATX_DATE_TO_DAY(in);
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
+ * Pack a FATX time.
+ */
+int fatx_pack_time(struct fatx_ts *in, uint16_t *out)
+{
+    *out = FATX_TIME(in->hour, in->minute, in->second);;
     return FATX_STATUS_SUCCESS;
 }
 
@@ -143,4 +162,32 @@ int fatx_unpack_time(uint16_t in, struct fatx_ts *out)
     out->minute = FATX_TIME_TO_MINUTE(in);
     out->second = FATX_TIME_TO_SECOND(in);
     return FATX_STATUS_SUCCESS;
+}
+
+void fatx_time_t_to_fatx_ts(const time_t in, struct fatx_ts *out)
+{
+    struct tm *t;
+
+    t = localtime(&in);
+
+    out->second = t->tm_sec;
+    out->minute = t->tm_min;
+    out->hour   = t->tm_hour;
+    out->day    = t->tm_mday;
+    out->month  = t->tm_mon;
+    out->year   = t->tm_year+1900;
+}
+
+time_t fatx_ts_to_time_t(struct fatx_ts *in)
+{
+    struct tm t;
+
+    t.tm_sec  = in->second;
+    t.tm_min  = in->minute;
+    t.tm_hour = in->hour;
+    t.tm_mday = in->day;
+    t.tm_mon  = in->month;
+    t.tm_year = in->year-1900;
+
+    return mktime(&t);
 }

@@ -50,10 +50,10 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     fs->partition_offset = offset;
     fs->partition_size   = size;
 
-    fs->device = fopen(fs->device_path, "rb");
+    fs->device = fopen(fs->device_path, "r+b");
     if (!fs->device)
     {
-        fatx_error(fs, "failed to open %s for reading\n", path);
+        fatx_error(fs, "failed to open %s for reading and writing\n", path);
         return -1;
     }
 

@@ -5,8 +5,7 @@ of FAT16/32 developed by Microsoft for the original Xbox console.
 
 Status
 ------
-Currently `fatxfs` provides only read access. Write functionality is in the
-works.
+`fatxfs` provides both read and write access to existing FATX formatted drives. It does not have the ability to create or format new drives.
 
 Platform Support
 ----------------

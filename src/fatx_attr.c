@@ -42,12 +42,77 @@ int fatx_dirent_to_attr(struct fatx_fs *fs, struct fatx_raw_directory_entry *ent
 }
 
 /*
+ * Populate a fatx_attr struct given a low-level directory entry.
+ */
+int fatx_attr_to_dirent(struct fatx_fs *fs, struct fatx_attr *attr, struct fatx_raw_directory_entry *entry)
+{
+    size_t filename_len = strlen(attr->filename);
+    entry->filename_len = filename_len;
+    memcpy(entry->filename, attr->filename, filename_len);
+
+    entry->attributes    = attr->attributes;
+    entry->first_cluster = attr->first_cluster;
+    entry->file_size     = attr->file_size;
+
+    fatx_pack_date(&(attr->modified), &(entry->modified_date));
+    fatx_pack_time(&(attr->modified), &(entry->modified_time));
+    fatx_pack_date(&(attr->created),  &(entry->created_date));
+    fatx_pack_time(&(attr->created),  &(entry->created_time));
+    fatx_pack_date(&(attr->accessed), &(entry->accessed_date));
+    fatx_pack_time(&(attr->accessed), &(entry->accessed_time));
+
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
  * Get attributes.
  */
+int fatx_get_attr_dir(struct fatx_fs *fs, char const *path, char const *start, struct fatx_dir *dir, struct fatx_dirent *dirent, struct fatx_attr *attr)
+{
+    struct fatx_dirent *nextdirent;
+    int status;
+
+    while (1)
+    {
+        status = fatx_read_dir(fs, dir, dirent, attr, &nextdirent);
+        if (status == FATX_STATUS_SUCCESS)
+        {
+            if (strcmp(start, dirent->filename) == 0)
+            {
+                /* Found! */
+                status = FATX_STATUS_SUCCESS;
+                break;
+            }
+        }
+        else if (status == FATX_STATUS_FILE_DELETED)
+        {
+            /* Read a deleted file entry. Skip over it... */
+        }
+        else if (status == FATX_STATUS_END_OF_DIR)
+        {
+            /* Path not found! */
+            status = FATX_STATUS_FILE_NOT_FOUND;
+            break;
+        }
+        else
+        {
+            /* Error */
+            status = FATX_STATUS_ERROR;
+            break;
+        }
+
+        /* Get the next directory entry. */
+        status = fatx_next_dir_entry(fs, dir);
+        if (status != FATX_STATUS_SUCCESS) break;
+    }
+
+    return status;
+}
+
 int fatx_get_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr)
 {
     struct fatx_dir dir;
-    struct fatx_dirent dirent, *nextdirent;
+    struct fatx_dirent dirent;
     int status;
     char const *start;
     size_t len, component;
@@ -76,41 +141,76 @@ int fatx_get_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr)
     status = fatx_open_dir(fs, subpath, &dir);
     if (status) return status;
 
-    while (1)
-    {
-        status = fatx_read_dir(fs, &dir, &dirent, attr, &nextdirent);
-        if (status == FATX_STATUS_SUCCESS)
-        {
-            if (strcmp(start, dirent.filename) == 0)
-            {
-                /* Found! */
-                status = FATX_STATUS_SUCCESS;
-                break;
-            }
-        }
-        else if (status == FATX_STATUS_FILE_DELETED)
-        {
-            /* Read a deleted file entry. Skip over it... */
-        }
-        else if (status == FATX_STATUS_END_OF_DIR)
-        {
-            /* Path not found! */
-            status = FATX_STATUS_FILE_NOT_FOUND;
-            break;
-        }
-        else
-        {
-            /* Error */
-            status = FATX_STATUS_ERROR;
-            break;
-        }
-
-        /* Get the next directory entry. */
-        status = fatx_next_dir_entry(fs, &dir);
-        if (status != FATX_STATUS_SUCCESS) break;
-    }
+    status = fatx_get_attr_dir(fs, path, start, &dir, &dirent, attr);
 
     fatx_close_dir(fs, &dir);
+    return status;
+}
+
+/*
+ * Write attributes to an existing file.
+ */
+int fatx_set_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr)
+{
+    struct fatx_dir dir;
+    struct fatx_dirent dirent;
+    struct fatx_attr old_attr;
+    int status;
+    char const *start;
+    size_t len, component;
+
+    fatx_debug(fs, "fatx_write_attr(path=\"%s\")\n", path);
+
+    char subpath[strlen(path)+1];
+
+    /* Get up to last path component. */
+    for (component=0; 1; component++)
+    {
+        status = fatx_get_path_component(path, component, &start, &len);
+        if (status) return status;
+
+        if (start == NULL)
+        {
+            /* Reached last path component. */
+            fatx_get_path_component(path, component-1, &start, &len);
+            len = start-path;
+            memcpy(subpath, path, len);
+            subpath[len] = '\0';
+            break;
+        }
+    }
+
+    status = fatx_open_dir(fs, subpath, &dir);
+    if (status) return status;
+
+    status = fatx_get_attr_dir(fs, path, start, &dir, &dirent, &old_attr);
+    if (status) return status;
+
+    /* If the filenames differ, take the new attr's filename as truth */
+    if(attr->filename && (strcmp(dirent.filename, attr->filename) == 0))
+    {
+        strcpy(dirent.filename, attr->filename);
+    }
+
+    status = fatx_write_dir(fs, &dir, &dirent, attr);
+    fatx_close_dir(fs, &dir);
+    return status;
+}
+
+int fatx_utime(struct fatx_fs *fs, char const *path, struct fatx_ts ts[2])
+{
+    int status;
+    struct fatx_attr attr;
+
+    fatx_debug(fs, "fatx_utime(path=\"%s\")\n", path);
+
+    status = fatx_get_attr(fs, path, &attr);
+    if (status) return status;
+
+    attr.accessed = ts[0];
+    attr.modified = ts[1];
+
+    status = fatx_set_attr(fs, path, &attr);
     return status;
 }
 

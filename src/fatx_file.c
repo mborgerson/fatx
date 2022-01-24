@@ -18,18 +18,20 @@
  */
 
 #include "fatx_internal.h"
+#include <stdbool.h>
+#include <time.h>
 
 /*
  * Determine the cluster which contains a byte offset of a file.
  */
-int fatx_find_cluster_for_file_offset(struct fatx_fs *fs, struct fatx_attr *attr, size_t offset, size_t *result)
+int fatx_find_cluster_for_file_offset_alloc(struct fatx_fs *fs, struct fatx_attr *attr, size_t offset, size_t *result, bool alloc)
 {
     fatx_fat_entry fat_entry;
-    size_t cluster;
+    size_t cluster, alloc_cluster;
     int status;
 
     /* Sanity check the offset. */
-    if (offset >= attr->file_size)
+    if (offset > attr->file_size)
     {
         fatx_error(fs, "offset out of range\n");
         return FATX_STATUS_ERROR;
@@ -40,7 +42,7 @@ int fatx_find_cluster_for_file_offset(struct fatx_fs *fs, struct fatx_attr *attr
 
     while (offset >= fs->bytes_per_cluster)
     {
-        fatx_error(fs, "seeking... cluster = %zx\n", cluster);
+        fatx_debug(fs, "seeking... cluster = %zx\n", cluster);
 
         /*
          * There is at least one more cluster.
@@ -55,6 +57,18 @@ int fatx_find_cluster_for_file_offset(struct fatx_fs *fs, struct fatx_attr *attr
             /* Great, there is another cluster. Move to it. */
             cluster = fat_entry;
         }
+        else if (alloc && status == FATX_CLUSTER_END)
+        {
+            fatx_debug(fs, "out of clusters, allocating new one\n");
+
+            status = fatx_alloc_cluster(fs, &alloc_cluster);
+            if (status) return status;
+
+            status = fatx_attach_cluster(fs, cluster, alloc_cluster);
+            if (status) return status;
+
+            cluster = alloc_cluster;
+        }
         else
         {
             /* Error. */
@@ -68,6 +82,11 @@ int fatx_find_cluster_for_file_offset(struct fatx_fs *fs, struct fatx_attr *attr
 
     *result = cluster;
     return FATX_STATUS_SUCCESS;
+}
+
+int fatx_find_cluster_for_file_offset(struct fatx_fs *fs, struct fatx_attr *attr, size_t offset, size_t *result)
+{
+    return fatx_find_cluster_for_file_offset_alloc(fs, attr, offset, result, false);
 }
 
 /*
@@ -90,6 +109,12 @@ int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, v
     /* Get file attributes. */
     status = fatx_get_attr(fs, path, &attr);
     if (status) return status;
+
+    if(offset >= attr.file_size)
+    {
+        fatx_error(fs, "eof\n");
+        return 0;
+    }
 
     /* Find the cluster, device byte offset containing the file offset. */
     status = fatx_find_cluster_for_file_offset(fs, &attr, offset, &cluster);
@@ -143,10 +168,10 @@ int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, v
         }
 
         /* Move to next cluster? */
-        fatx_error(fs, "cluster offset = %zx\n", cluster_offset);
+        fatx_debug(fs, "cluster offset = %zx\n", cluster_offset);
         if (cluster_offset >= fs->bytes_per_cluster)
         {
-            fatx_error(fs, "looking for next cluster...\n");
+            fatx_debug(fs, "looking for next cluster...\n");
             status = fatx_get_next_cluster(fs, &cluster);
             if (status)
             {
@@ -167,10 +192,251 @@ int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, v
 }
 
 /*
+ * Write to a file
+ *
+ * Returns the number of bytes written.
+ */
+int fatx_write(struct fatx_fs *fs, char const *path, off_t offset, size_t size, const void *buf)
+{
+    size_t total_bytes_written;
+    size_t cluster;
+    off_t cluster_offset;
+    struct fatx_attr attr;
+    int status;
+
+    fatx_debug(fs, "fatx_write(path=\"%s\", offset=0x%zx, size=0x%zx, buf=%p)\n", path, offset, size, buf);
+
+    /* Get file attributes. */
+    status = fatx_get_attr(fs, path, &attr);
+    if (status) return status;
+
+    /* If the file offset is invalid, truncate the file to the correct size */
+    if (offset > attr.file_size)
+    {
+        status = fatx_truncate(fs, path, offset+1);
+        if (status) return status;
+
+        /* Truncate modifies attr, so fetch it again */
+        status = fatx_get_attr(fs, path, &attr);
+        if (status) return status;
+    }
+
+    /* Find the cluster, device byte offset containing the file offset. */
+    status = fatx_find_cluster_for_file_offset_alloc(fs, &attr, offset, &cluster, true);
+    if (status)
+    {
+        fatx_error(fs, "failed to find cluster for offset\n");
+        return 0;
+    }
+
+    /* Seek to the offset. */
+    cluster_offset = offset % fs->bytes_per_cluster;
+    status = fatx_dev_seek_cluster(fs, cluster, cluster_offset);
+    if (status) return status;
+
+    total_bytes_written = 0;
+
+    while (1)
+    {
+        size_t bytes_to_write;
+        size_t bytes_written;
+
+        /* Careful not to overflow */
+        bytes_to_write = size - total_bytes_written;
+        if(fs->bytes_per_cluster >= cluster_offset)
+        {
+            bytes_to_write = MIN(fs->bytes_per_cluster - cluster_offset, bytes_to_write);   
+        }
+
+        /* Write to the current cluster if we have space. */
+        if (bytes_to_write > 0)
+        {
+            bytes_written = fatx_dev_write(fs, buf, 1, bytes_to_write);
+            if (bytes_written == 0)
+            {
+                fatx_error(fs, "failed to write to device\n");
+                return FATX_STATUS_ERROR;
+            }
+
+            total_bytes_written += bytes_written;
+            buf = (uint8_t *)buf + bytes_written;
+            cluster_offset += bytes_written;
+        }
+
+        if (size - total_bytes_written == 0)
+        {
+            fatx_debug(fs, "finished writing\n");
+            break;
+        }
+
+        /* Move to next cluster? */
+        fatx_debug(fs, "cluster offset = %zx\n", cluster_offset);
+        if (cluster_offset >= fs->bytes_per_cluster)
+        {
+            fatx_debug(fs, "looking for next cluster...\n");
+            status = fatx_get_next_cluster(fs, &cluster);
+            if (status)
+            {
+                fatx_debug(fs, "EOF, allocating new cluster\n");
+
+                size_t new_cluster;
+                status = fatx_alloc_cluster(fs, &new_cluster);
+                if (status) return status;
+
+                status = fatx_attach_cluster(fs, cluster, new_cluster);
+                if (status) return status;
+            }
+
+            status = fatx_dev_seek_cluster(fs, cluster, 0);
+            if (status) return status;
+
+            cluster_offset = 0;
+        }
+    }
+
+    fatx_debug(fs, "bytes written: %zx\n", total_bytes_written);
+
+    /* Update file size if it has increased. */
+    if(offset + size > attr.file_size)
+    {
+        attr.file_size += offset + size - attr.file_size;
+        status = fatx_set_attr(fs, path, &attr);
+        if (status) return status;
+    }
+
+    return total_bytes_written;
+}
+
+/*
  * Create a file.
  */
 int fatx_mknod(struct fatx_fs *fs, char const *path)
 {
+    struct fatx_attr attr;
+    struct fatx_dir dir;
+    char path_buf[strlen(path)+1];
+    int status;
+
     fatx_debug(fs, "fatx_mknod(path=\"%s\")\n", path);
-    return FATX_STATUS_ERROR;
+
+    /* Check for existence */
+    status = fatx_get_attr(fs, path, &attr);
+    if (!status)
+    {
+        fatx_error(fs, "file already exists\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    /* Open the directory. */
+    strcpy(path_buf, path);
+    status = fatx_open_dir(fs, fatx_dirname(path_buf), &dir);
+    if (status) return status;
+
+    /* Create the file node */
+    status = fatx_create_dirent(fs, path, &dir, 0);
+
+    /* Cleanup. */
+    fatx_close_dir(fs, &dir);
+    return status;
+}
+
+/*
+ * Truncate a file to the specified size
+ */
+int fatx_truncate(struct fatx_fs *fs, char const *path, off_t offset)
+{
+    fatx_debug(fs, "fatx_truncate(path=\"%s\", offset=0x%zx)\n", path, offset);
+
+    struct fatx_attr attr;
+    int status;
+
+    /* Get file attributes. */
+    status = fatx_get_attr(fs, path, &attr);
+    if (status) return status;
+
+    size_t enc_clusters = 1;
+    size_t cluster = attr.first_cluster;
+    while (enc_clusters * fs->bytes_per_cluster < offset)
+    {
+        status = fatx_get_next_cluster(fs, &cluster);
+        if (status == FATX_STATUS_ERROR)
+        {
+            /* Out of clusters, alloc more */
+            size_t new_cluster;
+            status = fatx_alloc_cluster(fs, &new_cluster);
+            if (status) return status;
+
+            status = fatx_attach_cluster(fs, cluster, new_cluster);
+            if (status) return status;
+
+            cluster = new_cluster;
+            ++enc_clusters;
+        }
+        else if (status == FATX_STATUS_SUCCESS)
+        {
+            /* Found next cluster, continue */
+            ++enc_clusters;
+        }
+        else return status;
+    }
+
+    /* If there are more clusters, then free them */
+    size_t next_cluster = cluster;
+    status = fatx_get_next_cluster(fs, &next_cluster);
+    if(status == FATX_STATUS_SUCCESS)
+    {
+        status = fatx_free_cluster_chain(fs, next_cluster);
+        if (status) return status;
+    }
+
+    /* Mark new end of cluster */
+    status = fatx_mark_cluster_end(fs, cluster);
+    if (status) return status;
+
+    /* Now update the file size */
+    attr.file_size = offset;
+    status = fatx_set_attr(fs, path, &attr);
+    if (status) return status;
+
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
+ * Rename a file
+ */
+int fatx_rename(struct fatx_fs *fs, char const *from, char const *to)
+{
+    fatx_debug(fs, "fatx_rename(from=\"%s\", to=\"%s\")\n", from, to);
+
+    struct fatx_attr attr;
+    char from_path[strlen(from)+1], to_path[strlen(to)+1], *to_base;
+    int status;
+
+    /* Sanity check that we're not trying to move the file */
+    strcpy(from_path, from);
+    strcpy(to_path, to);
+    if (strcmp(fatx_dirname(from_path), fatx_dirname(to_path)) != 0)
+    {
+        fatx_error(fs, "rename directories do not match\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    /* Get file attributes. */
+    status = fatx_get_attr(fs, from, &attr);
+    if (status) return status;
+
+    /* Check that the new filename is not too long */
+    strcpy(to_path, to);
+    to_base = fatx_basename(to_path);
+    if (strlen(to_base) >= FATX_MAX_FILENAME_LEN)
+    {
+        fatx_error(fs, "destination name too long\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    /* Rename the file */
+    strcpy(attr.filename, to_base);
+
+    /* Save new attributes */
+    return fatx_set_attr(fs, from, &attr);
 }

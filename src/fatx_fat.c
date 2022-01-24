@@ -309,7 +309,7 @@ int fatx_alloc_cluster(struct fatx_fs *fs, size_t *cluster)
 
     fatx_debug(fs, "fatx_alloc_cluster()\n");
 
-    for (i=0; 1; i++)
+    for (i=2; 1; i++)
     {
         status = fatx_get_fat_entry_for_cluster(fs, i, &fat_entry);
         if (status != FATX_STATUS_SUCCESS)
@@ -358,8 +358,19 @@ int fatx_attach_cluster(struct fatx_fs *fs, size_t tail, size_t cluster)
         return FATX_STATUS_ERROR;
     }
 
-    fatx_set_fat_entry_for_cluster(fs, tail, cluster);
-    fatx_mark_cluster_end(fs, cluster);
+    status = fatx_set_fat_entry_for_cluster(fs, tail, cluster);
+    if (status)
+    {
+        fatx_error(fs, "failed to set fat entry for cluster\n");
+        return status;
+    }
 
-    return FATX_STATUS_ERROR;
+    status = fatx_mark_cluster_end(fs, cluster);
+    if (status)
+    {
+        fatx_error(fs, "failed to mark cluster end\n");
+        return status;
+    }
+
+    return FATX_STATUS_SUCCESS;
 }

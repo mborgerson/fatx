@@ -18,6 +18,7 @@
  */
 
 #include "fatx_internal.h"
+#include <time.h>
 
 /*
  * Open a directory.
@@ -240,6 +241,145 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
 }
 
 /*
+ * Write over the current directory entry.
+ *
+ * dir should be the directory opened by a call to fatx_open_dir.
+ * entry should be a pointer to the fatx_dirent of the entry to be written.
+ * attr should be a pointer to the entry fatx_attr.
+ */
+int fatx_write_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *entry, struct fatx_attr *attr)
+{
+    struct fatx_raw_directory_entry directory_entry;
+    size_t items, offset;
+    int status;
+
+    fatx_debug(fs, "fatx_write_dir(cluster=%zd, entry=%zd)\n", dir->cluster, dir->entry);
+
+    /* Seek to the current cluster. */
+    offset = dir->entry * sizeof(struct fatx_raw_directory_entry);
+    status = fatx_dev_seek_cluster(fs, dir->cluster, offset);
+    if (status)
+    {
+        fatx_error(fs, "failed to seek to directory entry\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    /* Construct the raw directory entry */
+    size_t filename_len = strlen(entry->filename);
+    memcpy(directory_entry.filename, entry->filename, filename_len);
+
+    status = fatx_attr_to_dirent(fs, attr, &directory_entry);
+    if (status)
+    {
+        fatx_error(fs, "failed to set directory entry attributes\n");
+        return status;
+    }
+
+    fatx_debug(fs, "Writing fatx_raw_directory_entry{\n");
+    fatx_debug(fs, "\tfilename_len: \t0x%x\n", directory_entry.filename_len);
+    fatx_debug(fs, "\tattributes: \t0x%x\n", directory_entry.attributes);
+    fatx_debug(fs, "\tfilename: \t%s\n", entry->filename);
+    fatx_debug(fs, "\tfirst_cluster: \t0x%x\n", directory_entry.first_cluster);
+    fatx_debug(fs, "\tfile_size: \t0x%x\n", directory_entry.file_size);
+    fatx_debug(fs, "\tmodified_time: \t0x%x\n", directory_entry.modified_time);
+    fatx_debug(fs, "\tmodified_date: \t0x%x\n", directory_entry.modified_date);
+    fatx_debug(fs, "\tcreated_time: \t0x%x\n", directory_entry.created_time);
+    fatx_debug(fs, "\tcreated_date: \t0x%x\n", directory_entry.created_date);
+    fatx_debug(fs, "\taccessed_time: \t0x%x\n", directory_entry.accessed_time);
+    fatx_debug(fs, "\taccessed_date: \t0x%x\n", directory_entry.accessed_date);
+    fatx_debug(fs, "}\n");
+
+    /* Write out the raw directory entry. */
+    items = fatx_dev_write(fs, &directory_entry, sizeof(struct fatx_raw_directory_entry), 1);
+    if (items != 1)
+    {
+        fatx_error(fs, "failed to write directory entry\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
+ * Allocate a directory entry
+ * Sets dir->entry to the new entry
+ */
+int fatx_alloc_dir_entry(struct fatx_fs *fs, struct fatx_dir *dir)
+{
+    struct fatx_dirent entry, *result;
+    struct fatx_attr attr;
+    int status;
+    size_t new_cluster, cur_cluster, cur_entry;
+
+    fatx_debug(fs, "fatx_alloc_dir_entry()\n");
+
+    /* Scan directory entries for deleted files */
+    dir->entry = 0;
+    while (1)
+    {
+        status = fatx_read_dir(fs, dir, &entry, &attr, &result);
+        if (status == FATX_STATUS_SUCCESS)
+        {
+            fatx_debug(fs, "occupied entry at %d, continuing\n", dir->entry);
+            status = fatx_next_dir_entry(fs, dir);
+            if(status)
+            {
+                fatx_debug(fs, "out of entries to check, expanding directory\n");
+                break;
+            }
+        }
+        else if (status == FATX_STATUS_FILE_DELETED)
+        {
+            fatx_debug(fs, "found deleted file at %d, suitable entry for allocation\n", dir->entry);
+            return FATX_STATUS_SUCCESS;
+        }
+        else if (status == FATX_STATUS_END_OF_DIR)
+        {
+            fatx_debug(fs, "end of dir, expanding directory\n");
+            break;
+        }
+        else
+        {
+            fatx_error(fs, "unable to read directory entry\n");
+            return FATX_STATUS_ERROR;
+        }
+    }
+
+    /* If we have more space in the current cluster, then shift the end of file marker */
+    if (dir->entry < fs->bytes_per_cluster/sizeof(struct fatx_raw_directory_entry))
+    {
+        dir->entry += 1;
+        status = fatx_mark_end_of_dir(fs, dir);
+        if (status) return status;
+
+        /* Return to the newly freed entry */
+        dir->entry -= 1;
+        return FATX_STATUS_SUCCESS;
+    }
+
+    /* If all else fails, then allocate a new cluster */
+    status = fatx_alloc_cluster(fs, &new_cluster);
+    if (status) return status;
+
+    status = fatx_attach_cluster(fs, dir->cluster, new_cluster);
+    if (status) return status;
+
+    /* Mark first element in new cluster as end of dir */
+    cur_cluster  = dir->cluster;
+    dir->cluster = new_cluster;
+    cur_entry    = dir->entry;
+    dir->entry   = 0;
+
+    status = fatx_mark_end_of_dir(fs, dir);
+    if (status) return status;
+
+    /* We should have one entry in the old cluster, so use it */
+    dir->cluster = cur_cluster;
+    dir->entry   = cur_entry;
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
  * Close a directory.
  */
 int fatx_close_dir(struct fatx_fs *fs, struct fatx_dir *dir)
@@ -250,15 +390,15 @@ int fatx_close_dir(struct fatx_fs *fs, struct fatx_dir *dir)
 }
 
 /*
- * Mark a directory entry as deleted.
+ * Mark a directory entry as the specified marker (file deleted or end of directory).
  */
-int fatx_mark_dir_entry_deleted(struct fatx_fs *fs, struct fatx_dir *dir)
+int fatx_mark_dir_entry(struct fatx_fs *fs, struct fatx_dir *dir, size_t marker)
 {
     struct fatx_raw_directory_entry raw_dirent;
     size_t offset, items;
     int status;
 
-    fatx_debug(fs, "fatx_mark_dir_entry_deleted(cluster=%zd, entry=%zd)\n", dir->cluster, dir->entry);
+    fatx_debug(fs, "fatx_mark_dir_entry(cluster=%zd, entry=%zd)\n", dir->cluster, dir->entry);
 
     /* Seek to the directory entry. */
     offset = dir->entry * sizeof(struct fatx_raw_directory_entry);
@@ -286,7 +426,7 @@ int fatx_mark_dir_entry_deleted(struct fatx_fs *fs, struct fatx_dir *dir)
     }
 
     /* Finally, mark the file as deleted. */
-    raw_dirent.filename_len = FATX_END_OF_DIR_MARKER;
+    raw_dirent.filename_len = marker;
     items = fatx_dev_write(fs, &raw_dirent, sizeof(struct fatx_raw_directory_entry), 1);
     if (items != 1)
     {
@@ -294,6 +434,82 @@ int fatx_mark_dir_entry_deleted(struct fatx_fs *fs, struct fatx_dir *dir)
         return FATX_STATUS_ERROR;
     }
 
+    return FATX_STATUS_SUCCESS;
+}
+
+
+/*
+ * Mark a directory entry as deleted.
+ */
+int fatx_mark_dir_entry_deleted(struct fatx_fs *fs, struct fatx_dir *dir)
+{
+    return fatx_mark_dir_entry(fs, dir, FATX_DELETED_FILE_MARKER);
+}
+
+/*
+ * Mark a directory entry as end of directory.
+ */
+int fatx_mark_end_of_dir(struct fatx_fs *fs, struct fatx_dir *dir)
+{
+    return fatx_mark_dir_entry(fs, dir, FATX_END_OF_DIR_MARKER);
+}
+
+/*
+ * Creates a directory entry (node)
+ * Supply path, directory, and attributes
+ */
+int fatx_create_dirent(struct fatx_fs *fs, char const *path, struct fatx_dir *dir, uint8_t attributes)
+{
+    struct fatx_dirent entry;
+    struct fatx_attr attr;
+    char path_buf[strlen(path)+1];
+    char *filename;
+    int status;
+    size_t cluster;
+    time_t curtime;
+
+    /* Check basename is not too long */
+    strcpy(path_buf, path);
+    filename = fatx_basename(path_buf);
+    if (strlen(filename) >= FATX_MAX_FILENAME_LEN)
+    {
+        fatx_error(fs, "filename is too long\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    /* Prepare filename */
+    strcpy(entry.filename, filename);
+    strcpy(attr.filename, filename);
+
+    /* Allocate space for the file */
+    status = fatx_alloc_cluster(fs, &cluster);
+    if (status) return status;
+
+    /* Allocate directory entry for file */
+    status = fatx_alloc_dir_entry(fs, dir);
+    if (status)
+    {
+        fatx_free_cluster_chain(fs, cluster);
+        return status;
+    }
+
+    attr.file_size = 0;
+    attr.attributes = attributes;
+    attr.first_cluster = cluster;
+
+    curtime = time(NULL);
+    fatx_time_t_to_fatx_ts(curtime, &(attr.created));
+    fatx_time_t_to_fatx_ts(curtime, &(attr.modified));
+    fatx_time_t_to_fatx_ts(curtime, &(attr.accessed));
+
+    status = fatx_write_dir(fs, dir, &entry, &attr);
+    if (status)
+    {
+        fatx_free_cluster_chain(fs, cluster);
+        return status;
+    }
+
+    fatx_debug(fs, "created file successfully!\n");
     return FATX_STATUS_SUCCESS;
 }
 
@@ -372,6 +588,93 @@ cleanup:
  */
 int fatx_mkdir(struct fatx_fs *fs, char const *path)
 {
+    struct fatx_attr attr;
+    struct fatx_dir dir;
+    char path_buf[strlen(path)+1];
+    int status;
+
     fatx_debug(fs, "fatx_mkdir(path=\"%s\")\n", path);
-    return FATX_STATUS_ERROR;
+
+    /* Check for existence */
+    status = fatx_get_attr(fs, path, &attr);
+    if (!status)
+    {
+        fatx_error(fs, "node already exists\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    /* Open the directory. */
+    strcpy(path_buf, path);
+    status = fatx_open_dir(fs, fatx_dirname(path_buf), &dir);
+    if (status) return status;
+
+    /* Create the directory node */
+    status = fatx_create_dirent(fs, path, &dir, FATX_ATTR_DIRECTORY);
+    fatx_close_dir(fs, &dir);
+    if (status) return status;
+
+    /* Mark the directory as empty */
+    status = fatx_open_dir(fs, path, &dir);
+    if (status) return status;
+
+    status = fatx_mark_end_of_dir(fs, &dir);
+
+    /* Cleanup. */
+    fatx_close_dir(fs, &dir);
+    return status;
+}
+
+/*
+ * Remove a directory
+ */
+int fatx_rmdir(struct fatx_fs *fs, char const *path)
+{
+    struct fatx_dir dir;
+    struct fatx_dirent dirent, *result;
+    struct fatx_attr attr;
+    int status;
+
+    fatx_debug(fs, "fatx_rmdir(path=\"%s\")\n", path);
+
+    /* First, check that the directory is empty */
+    status = fatx_open_dir(fs, path, &dir);
+    if (status) return status;
+
+    /* Check every dirent in the directory, make sure none of them are used */
+    while (1)
+    {
+        status = fatx_read_dir(fs, &dir, &dirent, &attr, &result);
+        if (status == FATX_STATUS_SUCCESS)
+        {
+            fatx_error(fs, "directory not empty\n");
+            fatx_close_dir(fs, &dir);
+            return FATX_STATUS_END_OF_DIR;
+        }
+        else if (status == FATX_STATUS_FILE_DELETED)
+        {
+            /* Found deleted file, check next entry */
+            status = fatx_next_dir_entry(fs, &dir);
+            if (status != FATX_STATUS_SUCCESS)
+            {
+                fatx_error(fs, "failed to read next entry");
+                fatx_close_dir(fs, &dir);
+                return FATX_STATUS_ERROR;
+            }
+        }
+        else if (status == FATX_STATUS_END_OF_DIR)
+        {
+            /* Found end of directory, we can continue with the removal now */
+            fatx_close_dir(fs, &dir);
+            break;
+        }
+        else
+        {
+            /* Error */
+            fatx_close_dir(fs, &dir);
+            return FATX_STATUS_ERROR;
+        }        
+    }
+
+    /* Remove the entry from the parent dir */
+    return fatx_unlink(fs, path);
 }
