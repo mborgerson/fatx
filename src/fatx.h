@@ -45,6 +45,7 @@
 struct fatx_fs {
     char const *device_path;
     FILE       *device;
+    size_t      sector_size;
     size_t      partition_offset;
     size_t      partition_size;
     uint32_t    volume_id;
@@ -90,7 +91,7 @@ struct fatx_attr {
     struct fatx_ts accessed;
 };
 
-int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size);
+int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size);
 int fatx_close_device(struct fatx_fs *fs);
 int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir);
 int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *entry, struct fatx_attr *attr, struct fatx_dirent **result);
