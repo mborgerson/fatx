@@ -48,9 +48,6 @@
 #define FATX_FAT16_ENTRY_MASK        0x0000ffff
 #define FATX_FAT32_ENTRY_MASK        0x0fffffff
 
-/* Default number of bytes per sector. */
-#define FATX_BYTES_PER_SECTOR        512
-
 /* The root directory is special in that it is the very first cluster, and it
  * cannot be indexed using the typical 2 index convention. It is always the
  * first cluster. When fatx_read_dir sees this in the cluster field of struct

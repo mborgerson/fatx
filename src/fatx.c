@@ -27,26 +27,33 @@
 /*
  * Open a device.
  */
-int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size)
+int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size)
 {
     int retval;
 
     retval = 0;
 
-    /* Sanity check partition offset and size. */
-    if (offset % FATX_BYTES_PER_SECTOR)
+    if (sector_size != 512 && sector_size != 4096)
     {
-        fatx_error(fs, "specified partition offset does not reside on sector boundary (%d bytes)\n", FATX_BYTES_PER_SECTOR);
+        fatx_error(fs, "expected sector size to be 512 or 4096, got %d\n", sector_size);
         return -1;
     }
 
-    if (size % FATX_BYTES_PER_SECTOR)
+    /* Sanity check partition offset and size. */
+    if (offset % sector_size)
     {
-        fatx_error(fs, "specified partition size does not reside on sector boundary (%d bytes)\n", FATX_BYTES_PER_SECTOR);
+        fatx_error(fs, "specified partition offset does not reside on sector boundary (%d bytes)\n", sector_size);
+        return -1;
+    }
+
+    if (size % sector_size)
+    {
+        fatx_error(fs, "specified partition size does not reside on sector boundary (%d bytes)\n", sector_size);
         return -1;
     }
 
     fs->device_path      = path;
+    fs->sector_size      = sector_size;
     fs->partition_offset = offset;
     fs->partition_size   = size;
 
@@ -71,9 +78,9 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
         goto cleanup;
     }
 
-    fs->num_sectors       = fs->partition_size / FATX_BYTES_PER_SECTOR;
+    fs->num_sectors       = fs->partition_size / fs->sector_size;
     fs->num_clusters      = fs->num_sectors / fs->cluster_size;
-    fs->bytes_per_cluster = fs->cluster_size * FATX_BYTES_PER_SECTOR;
+    fs->bytes_per_cluster = fs->cluster_size * fs->sector_size;
     fs->fat_offset        = fs->partition_offset+FATX_FAT_OFFSET;
 
     if (fs->num_clusters < 65525)
@@ -105,7 +112,7 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     fatx_info(fs, "  Partition Offset:    0x%zx bytes\n", fs->partition_offset);
     fatx_info(fs, "  Partition Size:      0x%zx bytes\n", fs->partition_size);
     fatx_info(fs, "  Volume Id:           %.8x\n",        fs->volume_id);
-    fatx_info(fs, "  Bytes per Sector:    %d\n",          FATX_BYTES_PER_SECTOR);
+    fatx_info(fs, "  Bytes per Sector:    %d\n",          fs->sector_size);
     fatx_info(fs, "  # of Sectors:        %d\n",          fs->num_sectors);
     fatx_info(fs, "  Sectors per Cluster: %d\n",          fs->cluster_size);
     fatx_info(fs, "  # of Clusters:       %d\n",          fs->num_clusters);

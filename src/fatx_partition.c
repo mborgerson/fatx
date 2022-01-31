@@ -72,13 +72,6 @@ int fatx_process_superblock(struct fatx_fs *fs)
         return -1;
     }
 
-    if (superblock.cluster_size != 32)
-    {
-        fatx_error(fs, "expected cluster size to be 32, got %d\n",
-                   superblock.cluster_size);
-        return -1;
-    }
-
     if (superblock.num_fat_copies != 1)
     {
         fatx_error(fs, "expected number of FAT copies to be 1, got %d\n",
