@@ -203,7 +203,7 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
     }
 
     /* Was this the last directory entry? */
-    if (directory_entry.filename_len == FATX_END_OF_DIR_MARKER)
+    if (directory_entry.filename_len == FATX_END_OF_DIR_MARKER || directory_entry.filename_len == FATX_END_OF_DIR_MARKER2)
     {
         /* End of directory. */
         fatx_debug(fs, "reached the end of the directory\n");
