@@ -58,6 +58,7 @@
 /* Markers used in the filename_size field of the directory entry. */
 #define FATX_DELETED_FILE_MARKER     0xe5
 #define FATX_END_OF_DIR_MARKER       0xff
+#define FATX_END_OF_DIR_MARKER2      0x00
 
 /* Mask to be applied when reading directory entry attributes. */
 #define FATX_ATTR_MASK               0x0f
