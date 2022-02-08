@@ -42,14 +42,14 @@
 #define FATX_FAT_OFFSET              4096
 
 /* Number of reserved entries in the FAT. */
-#define FATX_FAT_RESERVED_ENTRIES    2
+#define FATX_FAT_RESERVED_ENTRIES    1
 
 /* Mask to be applied when reading FAT entry values. */
 #define FATX_FAT16_ENTRY_MASK        0x0000ffff
 #define FATX_FAT32_ENTRY_MASK        0x0fffffff
 
 /* The root directory is special in that it is the very first cluster, and it
- * cannot be indexed using the typical 2 index convention. It is always the
+ * cannot be indexed using the typical index convention. It is always the
  * first cluster. When fatx_read_dir sees this in the cluster field of struct
  * fatx_dir, it will read from the root directory cluster.
  */
