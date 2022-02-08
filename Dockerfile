@@ -1,8 +1,7 @@
 FROM ubuntu:20.04
 RUN apt-get update \
- && DEBIAN_FRONTEND=noninteractive apt-get install -qy fuse
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -qy \
-    build-essential pkg-config libfuse-dev cmake
+ && DEBIAN_FRONTEND=noninteractive apt-get install -qy \
+        build-essential pkg-config libfuse-dev cmake
 COPY . /usr/src/fatx
 WORKDIR /usr/src/fatx
 RUN mkdir build \
