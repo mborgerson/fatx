@@ -15,22 +15,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-set(LIBFATXFS_SOURCES ${LIBFATXFS_SOURCES}
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx.c
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx.h
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_attr.c
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_dev.c
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_dir.c
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_fat.c
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_file.c
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_internal.h
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_log.c
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_log.h
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_misc.c
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_partition.c
-                      ${CMAKE_CURRENT_SOURCE_DIR}/fatx_version.h
-                      PARENT_SCOPE
-                      )
+set(FATX_SOURCES ${FATX_SOURCES}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx.c
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx.h
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_attr.c
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_dev.c
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_dir.c
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_fat.c
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_file.c
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_internal.h
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_log.c
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_log.h
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_misc.c
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_partition.c
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_version.h
+                 PARENT_SCOPE
+                 )
 
 set(FATXFS_SOURCES ${FATXFS_SOURCES}
                    ${CMAKE_CURRENT_SOURCE_DIR}/fatxfs_fuse.c

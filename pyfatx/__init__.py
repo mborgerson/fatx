@@ -2,8 +2,8 @@
 import os
 from typing import Optional, Generator, Tuple, Sequence
 
-from .libfatxfs import ffi
-from .libfatxfs.lib import *
+from .libfatx import ffi
+from .libfatx.lib import *
 
 
 class FatxAttr:

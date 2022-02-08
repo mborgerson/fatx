@@ -30,13 +30,13 @@ class FfiPreBuildExtension(build_ext):
 
         # Build sleigh and csleigh library
         subprocess.check_call(['cmake', '-B', 'build'] + cmake_config_args, cwd=ROOT_DIR)
-        subprocess.check_call(['cmake', '--build', 'build', '--parallel', '--verbose', '--target', 'libfatxfs'] + cmake_build_args, cwd=ROOT_DIR)
+        subprocess.check_call(['cmake', '--build', 'build', '--parallel', '--verbose', '--target', 'fatx'] + cmake_build_args, cwd=ROOT_DIR)
 
 
 def ffibuilder():
     from cffi import FFI
     ffi = FFI()
-    ffi.set_source("pyfatx.libfatxfs",
+    ffi.set_source("pyfatx.libfatx",
         """
         #include <stdlib.h>
         #include <fatx.h>
@@ -50,7 +50,7 @@ def ffibuilder():
         }
 
         """,
-        libraries=['libfatxfs'],
+        libraries=['fatx'],
         include_dirs=[SRC_DIR],
         library_dirs=[BUILD_DIR])
     ffi.cdef("""

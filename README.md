@@ -1,16 +1,17 @@
 fatx
 ====
-* `libfatxfs` is a C library for reading and writing the FATX filesystem, a
-  variant of FAT16/32 developed by Microsoft for the original Xbox console. It
-  does not have the ability to create or format new drives.
-* `fatxfs` is a userspace filesystem driver built for FUSE using libfatxfs that
-  enables you to mount a FATX filesystem on your host system and interact with
-  it using your typical system tools.
-* `pyfatx` is a Python module providing bindings to libfatxfs.
+* `libfatx` is a C library for working with the FATX filesystem, a variant of
+  FAT16/32 developed by Microsoft for the original Xbox console. It does not
+  have the ability to create or format new drives yet.
+* `fatxfs` is a [FUSE userspace filesystem
+  driver](https://en.wikipedia.org/wiki/Filesystem_in_Userspace) built using
+  libfatx that enables you to mount a FATX filesystem on your host system and
+  interact with it using your typical system tools.
+* `pyfatx` is a Python module providing bindings to libfatx.
 
 Status
 ------
-`libfatxfs` provides both read and write access to existing FATX formatted
+`libfatx` provides both read and write access to existing FATX formatted
 drives. It does not have the ability to create or format new drives.
 
 fatxfs: FUSE filesystem driver
