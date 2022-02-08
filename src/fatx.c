@@ -79,8 +79,8 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     }
 
     fs->num_sectors       = fs->partition_size / fs->sector_size;
-    fs->num_clusters      = fs->num_sectors / fs->cluster_size;
-    fs->bytes_per_cluster = fs->cluster_size * fs->sector_size;
+    fs->num_clusters      = fs->num_sectors / fs->sectors_per_cluster;
+    fs->bytes_per_cluster = fs->sectors_per_cluster * fs->sector_size;
     fs->fat_offset        = fs->partition_offset+FATX_FAT_OFFSET;
 
     size_t cluster_limit = fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT;
@@ -119,7 +119,7 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     fatx_info(fs, "  Volume Id:           %.8x\n",        fs->volume_id);
     fatx_info(fs, "  Bytes per Sector:    %d\n",          fs->sector_size);
     fatx_info(fs, "  # of Sectors:        %d\n",          fs->num_sectors);
-    fatx_info(fs, "  Sectors per Cluster: %d\n",          fs->cluster_size);
+    fatx_info(fs, "  Sectors per Cluster: %d\n",          fs->sectors_per_cluster);
     fatx_info(fs, "  # of Clusters:       %d\n",          fs->num_clusters);
     fatx_info(fs, "  FAT Offset:          0x%zx bytes\n", fs->fat_offset);
     fatx_info(fs, "  FAT Size:            0x%zx bytes\n", fs->fat_size);

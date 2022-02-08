@@ -89,7 +89,7 @@
 #pragma pack(1)
 struct fatx_superblock {
     uint32_t volume_id;
-    uint32_t cluster_size;
+    uint32_t sectors_per_cluster;
     uint16_t root_cluster;
     uint32_t unknown1;
 };
