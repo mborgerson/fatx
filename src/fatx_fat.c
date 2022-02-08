@@ -192,13 +192,6 @@ int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, size_
 {
     fatx_debug(fs, "fatx_cluster_number_to_byte_offset - cluster = %zd\n", cluster);
 
-    if (cluster == FATX_ROOT_DIR_CLUSTER)
-    {
-        /* Root directory is desired. */
-        *offset = fs->root_offset;
-        return FATX_STATUS_SUCCESS;
-    }
-
     if (cluster < FATX_FAT_RESERVED_ENTRIES_COUNT || cluster >= fs->num_clusters)
     {
         fatx_error(fs, "cluster number out of range %zd\n", cluster);

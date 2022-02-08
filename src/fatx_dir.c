@@ -41,7 +41,7 @@ int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir)
         return -1;
     }
 
-    dir->cluster = FATX_ROOT_DIR_CLUSTER;
+    dir->cluster = fs->root_cluster;
     dir->entry   = 0;
 
     for (component=1; 1; component++)

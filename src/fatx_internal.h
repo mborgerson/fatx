@@ -48,13 +48,6 @@
 #define FATX_FAT16_ENTRY_MASK        0x0000ffff
 #define FATX_FAT32_ENTRY_MASK        0x0fffffff
 
-/* The root directory is special in that it is the very first cluster, and it
- * cannot be indexed using the typical index convention. It is always the
- * first cluster. When fatx_read_dir sees this in the cluster field of struct
- * fatx_dir, it will read from the root directory cluster.
- */
-#define FATX_ROOT_DIR_CLUSTER 0
-
 /* Markers used in the filename_size field of the directory entry. */
 #define FATX_DELETED_FILE_MARKER     0xe5
 #define FATX_END_OF_DIR_MARKER       0xff
@@ -97,7 +90,7 @@
 struct fatx_superblock {
     uint32_t volume_id;
     uint32_t cluster_size;
-    uint16_t num_fat_copies;
+    uint16_t root_cluster;
     uint32_t unknown1;
 };
 #pragma pack()
