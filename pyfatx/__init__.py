@@ -56,7 +56,13 @@ class Fatx:
 		if isinstance(path, str):
 			path = path.encode('utf-8')
 		s = fatx_open_device(self.fs, path, offset, size, secsize)
+		if s != 0:
+			self.fs = None
 		assert s == 0
+
+	def __del__(self):
+		if self.fs is not None:
+			fatx_close_device(self.fs)
 
 	def _sanitize_path(self, path):
 		if isinstance(path, str):
