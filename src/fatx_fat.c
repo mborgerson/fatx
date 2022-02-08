@@ -153,11 +153,11 @@ int fatx_get_fat_entry_type(struct fatx_fs *fs, fatx_fat_entry entry)
         if (entry == 1)
             return FATX_CLUSTER_RESERVED;
 
+        if (entry >= FATX_FAT_RESERVED_ENTRIES_COUNT && entry <= 0xfff6)
+            return FATX_CLUSTER_DATA;
+
         if (entry == 0xfff7)
             return FATX_CLUSTER_BAD;
-
-        if (entry >= 0x0002 && entry <= 0xfff6)
-            return FATX_CLUSTER_DATA;
 
         if (entry >= 0xfff8 && entry <= 0xffff)
             return FATX_CLUSTER_END;
@@ -172,11 +172,11 @@ int fatx_get_fat_entry_type(struct fatx_fs *fs, fatx_fat_entry entry)
         if (entry == 1)
             return FATX_CLUSTER_RESERVED;
 
+        if (entry >= FATX_FAT_RESERVED_ENTRIES_COUNT && entry <= 0x0ffffff6)
+            return FATX_CLUSTER_DATA;
+
         if (entry == 0x0ffffff7)
             return FATX_CLUSTER_BAD;
-
-        if (entry >= 0x00000002 && entry <= 0x0ffffff6)
-            return FATX_CLUSTER_DATA;
 
         if (entry >= 0x0ffffff8 && entry <= 0x0fffffff)
             return FATX_CLUSTER_END;
