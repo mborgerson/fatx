@@ -1,18 +1,24 @@
-fatxfs
-======
-`fatxfs` is a userspace filesystem driver for the FATX filesystem, a varient
-of FAT16/32 developed by Microsoft for the original Xbox console.
+fatx
+====
+* `libfatxfs` is a C library for reading and writing the FATX filesystem, a
+  variant of FAT16/32 developed by Microsoft for the original Xbox console. It
+  does not have the ability to create or format new drives.
+* `fatxfs` is a userspace filesystem driver built for FUSE using libfatxfs that
+  enables you to mount a FATX filesystem on your host system and interact with
+  it using your typical system tools.
+* `pyfatx` is a Python module providing bindings to libfatxfs.
 
 Status
 ------
-`fatxfs` provides both read and write access to existing FATX formatted drives. It does not have the ability to create or format new drives.
+`libfatxfs` provides both read and write access to existing FATX formatted
+drives. It does not have the ability to create or format new drives.
 
-Platform Support
-----------------
+fatxfs: FUSE filesystem driver
+------------------------------
+### Platform Support
 Works on Linux and macOS. Other platform support is possible, but untested.
 
-Build via Docker
-----------------
+### Build via Docker
 fatxfs can be easily built inside a [Docker](https://www.docker.com/)
 container. If you use this method, you can skip the prerequisites and
 build instructions below.
@@ -24,28 +30,27 @@ build instructions below.
     # fatxfs xbox.img c
     # ls c
 
-How to Build (Natively)
------------------------
-### Prerequisites
+### How to Build (Natively)
+#### Prerequisites
 
-#### Ubuntu
+##### Ubuntu
 Assuming you already have typical build tools installed, install FUSE and CMake:
 
     $ sudo apt-get install libfuse-dev cmake
 
-#### OS X
+##### OS X
 Download Xcode (available from the App Store) to get command line tools.
 
 Assuming you have homebrew installed, install `pkgconfig` and `cmake`:
 
     $ brew install install pkgconfig cmake macfuse
 
-### Download Source
+#### Download Source
 Clone the repository:
 
     $ git clone https://github.com/mborgerson/fatx && cd fatx
 
-### Build
+#### Build
 Create a build directory and run `cmake` to construct the Makefiles:
 
     $ mkdir build && cd build
@@ -55,8 +60,7 @@ Finally, start the build:
 
     $ make
 
-How to Use
-----------
+### How to Use
 Firstly, you will need a raw disk image or block device to mount. Then, you can
 simply create a mountpoint and mount the "C drive" (default behavior). For
 example:
@@ -73,9 +77,8 @@ Or, you can specify the offset and size of the partition manually:
 
     $ ./fatxfs /dev/nbd0 c_drive --offset=0x8ca80000 --size=0x01f400000
 
-Tips
-----
-### Mounting a qcow Image
+### Tips
+#### Mounting a qcow Image
 If your disk image is a [qcow](https://en.wikipedia.org/wiki/Qcow) image, you
 can mount it as a network block device before mounting a partition on the
 device:
@@ -90,10 +93,20 @@ Unfortunately, on OS X, there is not a way to mount a qcow image like this
 
     $ qemu-img convert /path/to/image.qcow /path/to/output.raw
 
-### Logging
+#### Logging
 For debug purposes, you can have `fatxfs` log operations to a file given by the
 `--log` option. You can control the amount of output using the `--loglevel`
 option.
+
+pyfatx
+------
+The pyfatx library can be installed via:
+
+    $ pip install git+https://github.com/mborgerson/fatx
+
+A FATX filesystem can be extracted with:
+
+    $ python -m pyfatx -x ./path/to/disk.img
 
 License
 -------
