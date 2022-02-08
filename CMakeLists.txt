@@ -20,7 +20,7 @@ cmake_minimum_required(VERSION 2.6)
 project(fatxfs)
 
 find_package(PkgConfig)
-pkg_search_module(FUSE REQUIRED fuse)
+pkg_search_module(FUSE fuse)
 
 set(FATX_SOURCES "")
 set(FATXFS_SOURCES "")
@@ -28,12 +28,15 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/src)
 
 add_definitions("-ansi -Wall --std=c99 -pedantic")
 add_library(fatx ${FATX_SOURCES})
-add_executable(fatxfs ${FATXFS_SOURCES})
-target_link_libraries(fatxfs fatx ${FUSE_LDFLAGS})
-target_include_directories(fatxfs PUBLIC ${FUSE_INCLUDE_DIRS})
-target_compile_options(fatxfs PUBLIC ${FUSE_CFLAGS_OTHER})
-install(TARGETS fatxfs DESTINATION bin)
 
-find_program(RONN NAMES ronn)
-add_custom_target(fatxfs.1 ${RONN} < ${CMAKE_SOURCE_DIR}/man/fatxfs.1.ronn
-                                   > ${CMAKE_BINARY_DIR}/fatxfs.1)
+if(FUSE_MODULE_NAME)
+    add_executable(fatxfs ${FATXFS_SOURCES})
+    target_link_libraries(fatxfs fatx ${FUSE_LDFLAGS})
+    target_include_directories(fatxfs PUBLIC ${FUSE_INCLUDE_DIRS})
+    target_compile_options(fatxfs PUBLIC ${FUSE_CFLAGS_OTHER})
+    install(TARGETS fatxfs DESTINATION bin)
+
+    find_program(RONN NAMES ronn)
+    add_custom_target(fatxfs.1 ${RONN} < ${CMAKE_SOURCE_DIR}/man/fatxfs.1.ronn
+                                       > ${CMAKE_BINARY_DIR}/fatxfs.1)
+endif()
