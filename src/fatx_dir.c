@@ -219,7 +219,7 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
         return FATX_STATUS_FILE_DELETED;
     }
 
-    fatx_debug(fs, "dirent %zd of cluster %zd data starts at %d\n", dir->entry, dir->cluster, directory_entry.first_cluster);
+    fatx_debug(fs, "dirent %zd of cluster %zd data starts at %08x\n", dir->entry, dir->cluster, directory_entry.first_cluster);
 
     /* Copy filename. */
     memcpy(entry->filename, directory_entry.filename, directory_entry.filename_len);
