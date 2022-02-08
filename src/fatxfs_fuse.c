@@ -627,6 +627,7 @@ void fatx_fuse_print_usage(void)
                     "    --drive=<letter>       mount a partition by its drive letter\n"
                     "    --offset=<offset>      specify the offset (in bytes) of a partition manually\n"
                     "    --size=<size>          specify the size (in bytes) of a partition manually\n"
+                    "    --sector-size=<size>   specify the size (in bytes) of a device sector (default is 512)\n"
                     "    --log=<log path>       enable fatxfs logging\n"
                     "    --loglevel=<level>     control the log output level (a higher value yields more output)\n\n");
 
