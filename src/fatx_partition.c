@@ -65,15 +65,14 @@ int fatx_process_superblock(struct fatx_fs *fs)
     }
 
     read = fatx_dev_read(fs, &superblock, sizeof(struct fatx_superblock), 1);
-
     if (read != 1)
     {
         fatx_error(fs, "failed to read superblock\n");
         return -1;
     }
 
-    fs->volume_id    = superblock.volume_id;
-    fs->cluster_size = superblock.cluster_size;
+    fs->volume_id = superblock.volume_id;
+    fs->sectors_per_cluster = superblock.sectors_per_cluster;
     fs->root_cluster = superblock.root_cluster;
 
     return FATX_STATUS_SUCCESS;

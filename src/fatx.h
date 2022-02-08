@@ -51,7 +51,7 @@ struct fatx_fs {
     uint32_t    volume_id;
     uint32_t    num_sectors;
     uint32_t    num_clusters;
-    uint32_t    cluster_size;
+    uint32_t    sectors_per_cluster;
     uint8_t     fat_type;
     size_t      fat_offset;
     size_t      fat_size;
