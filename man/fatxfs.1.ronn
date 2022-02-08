@@ -59,6 +59,9 @@ OPTIONS
    * --size=<size>:
      specify the size (in bytes) of a partition manually
 
+   * --sector-size=<size>
+     specify the size (in bytes) of a device sector (default is 512)
+
    * --log=<log path>:
      enable fatxfs logging
 
