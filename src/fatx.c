@@ -86,12 +86,12 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     if (fs->num_clusters < 65525)
     {
         fs->fat_type = FATX_FAT_TYPE_16;
-        fs->fat_size = fs->num_clusters*2;
+        fs->fat_size = (fs->num_clusters + FATX_FAT_RESERVED_ENTRIES)*2;
     }
     else
     {
         fs->fat_type = FATX_FAT_TYPE_32;
-        fs->fat_size = fs->num_clusters*4;
+        fs->fat_size = (fs->num_clusters + FATX_FAT_RESERVED_ENTRIES)*4;
     }
 
     /* Round FAT size up to nearest 4k boundary. */
