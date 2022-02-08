@@ -42,7 +42,7 @@
 #define FATX_FAT_OFFSET              4096
 
 /* Number of reserved entries in the FAT. */
-#define FATX_FAT_RESERVED_ENTRIES    1
+#define FATX_FAT_RESERVED_ENTRIES_COUNT 1
 
 /* Mask to be applied when reading FAT entry values. */
 #define FATX_FAT16_ENTRY_MASK        0x0000ffff
