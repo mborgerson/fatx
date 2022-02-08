@@ -7,7 +7,7 @@ function checksum {
 
 tar xvf xbox_hdd.img.tgz
 mkdir -p c
-fatxfs xbox_hdd.img c
+fatxfs --log=log.txt --loglevel=100 xbox_hdd.img c
 [[ $(checksum c/xboxdash.xbe) = "338e6e203d9f1db5f2c1d976b8969af42049c32e1a65ac0347fbc6efcf5bd7c6" ]]
 
 # Copy a file in
