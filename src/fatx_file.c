@@ -110,7 +110,7 @@ int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, v
     status = fatx_get_attr(fs, path, &attr);
     if (status) return status;
 
-    if(offset >= attr.file_size)
+    if (offset >= attr.file_size)
     {
         fatx_error(fs, "eof\n");
         return 0;
