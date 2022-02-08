@@ -55,8 +55,7 @@ struct fatx_fs {
     uint8_t     fat_type;
     size_t      fat_offset;
     size_t      fat_size;
-    size_t      root_offset;
-    size_t      root_size;
+    size_t      root_cluster;
     size_t      cluster_offset;
     size_t      bytes_per_cluster;
     FILE       *log_handle;

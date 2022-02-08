@@ -72,15 +72,9 @@ int fatx_process_superblock(struct fatx_fs *fs)
         return -1;
     }
 
-    if (superblock.num_fat_copies != 1)
-    {
-        fatx_error(fs, "expected number of FAT copies to be 1, got %d\n",
-                   superblock.num_fat_copies);
-        return -1;
-    }
-
     fs->volume_id    = superblock.volume_id;
     fs->cluster_size = superblock.cluster_size;
+    fs->root_cluster = superblock.root_cluster;
 
     return FATX_STATUS_SUCCESS;
 }

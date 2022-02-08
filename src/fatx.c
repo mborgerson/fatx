@@ -83,6 +83,13 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     fs->bytes_per_cluster = fs->cluster_size * fs->sector_size;
     fs->fat_offset        = fs->partition_offset+FATX_FAT_OFFSET;
 
+    if (fs->root_cluster > (fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT))
+    {
+        fatx_error(fs, "root cluster %d exceeds cluster limit\n", fs->root_cluster);
+        retval = -1;
+        goto cleanup;
+    }
+
     if (fs->num_clusters < 65525)
     {
         fs->fat_type = FATX_FAT_TYPE_16;
@@ -100,12 +107,8 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
         fs->fat_size += 4096 - fs->fat_size % 4096;
     }
 
-    /* Calculate start and size of the root directory. */
-    fs->root_offset = fs->fat_offset + fs->fat_size;
-    fs->root_size   = 1 * fs->bytes_per_cluster;
-
     /* Calculate start of data clusters. */
-    fs->cluster_offset = fs->root_offset + fs->root_size;
+    fs->cluster_offset = fs->fat_offset + fs->fat_size;
 
     fatx_info(fs, "Partition Info:\n");
     fatx_info(fs, "  Device Path:         %s\n",          fs->device_path);
@@ -119,8 +122,7 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     fatx_info(fs, "  FAT Offset:          0x%zx bytes\n", fs->fat_offset);
     fatx_info(fs, "  FAT Size:            0x%zx bytes\n", fs->fat_size);
     fatx_info(fs, "  FAT Type:            %s\n",          fs->fat_type == FATX_FAT_TYPE_16 ? "16" : "32");
-    fatx_info(fs, "  Root Offset:         0x%zx bytes\n", fs->root_offset);
-    fatx_info(fs, "  Root Size:           0x%zx bytes\n", fs->root_size);
+    fatx_info(fs, "  Root Cluster:        %d\n",          fs->root_cluster);
     fatx_info(fs, "  Cluster Offset:      0x%zx bytes\n", fs->cluster_offset);
     return FATX_STATUS_SUCCESS;
 
