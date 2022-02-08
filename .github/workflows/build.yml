@@ -36,6 +36,12 @@ jobs:
         run: |
           cd tests
           ./test.sh
+      - name: Test Python bindings
+        run: |
+          rm -rf build
+          pip install --user .
+          cd tests
+          python test.py
   BuildDocker:
     name: Build Docker image on Ubuntu
     runs-on: ubuntu-latest
@@ -69,6 +75,13 @@ jobs:
           cd build
           cmake ..
           make install
+      - name: Test Python bindings
+        run: |
+          rm -rf build
+          pip3 install --user .
+          cd tests
+          tar xvf xbox_hdd.img.tgz
+          python3 test.py
       # XXX: Crashes
       # - name: Test
       #   run: |
