@@ -130,8 +130,6 @@ size_t fatx_dev_write(struct fatx_fs *fs, const void *buf, size_t size, size_t i
 int fatx_read_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry *entry);
 int fatx_write_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry entry);
 int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, size_t *offset);
-int fatx_get_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_entry *fat_entry);
-int fatx_set_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_entry fat_entry);
 int fatx_get_fat_entry_type(struct fatx_fs *fs, fatx_fat_entry entry);
 int fatx_get_next_cluster(struct fatx_fs *fs, size_t *cluster);
 int fatx_mark_cluster_available(struct fatx_fs *fs, size_t cluster);
