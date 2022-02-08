@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-from pyfatx import Fatx
 import os
 import argparse
 import hashlib
+
+from pyfatx import Fatx
 
 
 def main():
@@ -18,7 +19,7 @@ def main():
 	ap.add_argument('device')
 	args = ap.parse_args()
 
-	fs = Fatx(args.device, offset=args.offset, size=args.size, drive=args.drive, secsize=args.sector_size)
+	fs = Fatx(args.device, offset=args.offset, size=args.size, drive=args.drive, sector_size=args.sector_size)
 	if args.list:
 		for dirpath, dirnames, filenames in fs.walk('/'):
 			for f in filenames:

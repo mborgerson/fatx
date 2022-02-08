@@ -1,11 +1,17 @@
+#!/usr/bin/env python3
+import os
+from typing import Optional, Generator, Tuple, Sequence
+
 from .libfatxfs import ffi
 from .libfatxfs.lib import *
-import os
 
 
 class FatxAttr:
+	"""
+	FATX File Attribute Structure
+	"""
 
-	def __init__(self, filename, attributes, filesize):
+	def __init__(self, filename: str, attributes: int, filesize: int):
 		self.filename = filename
 		self.attributes = attributes
 		self.file_size = filesize
@@ -40,8 +46,12 @@ class FatxAttr:
 
 
 class Fatx:
+	"""
+	FATX Filesystem Interface
+	"""
 
-	def __init__(self, path, offset=None, size=None, drive='c', secsize=512):
+	def __init__(self, path: str, offset: Optional[int] = None, size: Optional[int] = None, drive: str = 'c',
+		         sector_size: int = 512):
 		self.fs = pyfatx_open_helper()
 		assert self.fs
 		if offset is None:
@@ -55,7 +65,7 @@ class Fatx:
 			offset, size = partitions[drive]
 		if isinstance(path, str):
 			path = path.encode('utf-8')
-		s = fatx_open_device(self.fs, path, offset, size, secsize)
+		s = fatx_open_device(self.fs, path, offset, size, sector_size)
 		if s != 0:
 			self.fs = None
 		assert s == 0
@@ -75,14 +85,20 @@ class Fatx:
 		fname = ffi.string(in_attr.filename).decode('ascii')
 		return FatxAttr(fname, in_attr.attributes, in_attr.file_size)
 
-	def get_attr(self, path):
+	def get_attr(self, path: str) -> FatxAttr:
+		"""
+		Get file attributes for a given path.
+		"""
 		path = self._sanitize_path(path)
 		attr = ffi.new('struct fatx_attr *')
 		s = fatx_get_attr(self.fs, path, attr)
 		assert s == 0
 		return self._create_attr(attr)
 
-	def listdir(self, path):
+	def listdir(self, path: str) -> Generator[FatxAttr, None, None]:
+		"""
+		List the files in a directory.
+		"""
 		path = self._sanitize_path(path)
 		d = ffi.new('struct fatx_dir *')
 		s = fatx_open_dir(self.fs, path, d)
@@ -106,7 +122,10 @@ class Fatx:
 		s = fatx_close_dir(self.fs, d)
 		assert s == 0
 
-	def walk(self, path):
+	def walk(self, path: str) -> Generator[Tuple[str, Sequence[FatxAttr], Sequence[FatxAttr]], None, None]:
+		"""
+		Walk the filesystem.
+		"""
 		attrs = list(self.listdir(path))
 		dirnames = [d.filename for d in attrs if d.is_directory]
 		filenames = [f.filename for f in attrs if f.is_file]
@@ -114,7 +133,10 @@ class Fatx:
 		for d in dirnames:
 			yield from self.walk(os.path.join(path, d))
 
-	def read(self, path, offset=0, size=None):
+	def read(self, path: str, offset: int = 0, size: Optional[int] = None) -> bytes:
+		"""
+		Read a file.
+		"""
 		path = self._sanitize_path(path)
 		attr = self.get_attr(path)
 		assert(attr.is_file)
