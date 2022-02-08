@@ -17,7 +17,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdbool.h>
 #include "fatx_internal.h"
+
+static bool fatx_cluster_valid(struct fatx_fs *fs, size_t cluster)
+{
+    return (cluster >= FATX_FAT_RESERVED_ENTRIES_COUNT) &&
+           (cluster < fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT);
+}
 
 /*
  * Read from the FAT.
@@ -28,7 +35,7 @@ int fatx_read_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry *entry)
 
     fatx_debug(fs, "fatx_read_fat(index=%zd)\n", index);
 
-    if (index >= fs->num_clusters)
+    if (!fatx_cluster_valid(fs, index))
     {
         fatx_error(fs, "index number out of bounds\n");
         return -1;
@@ -63,7 +70,7 @@ int fatx_write_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry entry)
 
     fatx_debug(fs, "fatx_write_fat(index=%zd, entry=%zx)\n", index, entry);
 
-    if (index >= fs->num_clusters)
+    if (!fatx_cluster_valid(fs, index))
     {
         fatx_error(fs, "index number out of bounds\n");
         return -1;
@@ -83,56 +90,6 @@ int fatx_write_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry entry)
     {
         fatx_error(fs, "failed to write fat index %zd\n", index);
         return FATX_STATUS_ERROR;
-    }
-
-    return FATX_STATUS_SUCCESS;
-}
-
-/*
- * Get the FAT entry for a given cluster.
- */
-int fatx_get_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_entry *fat_entry)
-{
-    int status;
-
-    fatx_debug(fs, "fatx_get_fat_entry_for_cluster(cluster=%zd)\n", cluster);
-
-    if (cluster < FATX_FAT_RESERVED_ENTRIES_COUNT || cluster >= fs->num_clusters)
-    {
-        fatx_error(fs, "cluster number out of range\n");
-        return -1;
-    }
-
-    status = fatx_read_fat(fs, cluster, fat_entry);
-    if (status != FATX_STATUS_SUCCESS)
-    {
-        /* An error occured. */
-        return status;
-    }
-
-    return FATX_STATUS_SUCCESS;
-}
-
-/*
- * Set the FAT entry for a given cluster.
- */
-int fatx_set_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_entry fat_entry)
-{
-    int status;
-
-    fatx_debug(fs, "fatx_set_fat_entry_for_cluster(cluster=%zd)\n", cluster);
-
-    if (cluster < FATX_FAT_RESERVED_ENTRIES_COUNT || cluster >= fs->num_clusters)
-    {
-        fatx_error(fs, "cluster number out of range\n");
-        return -1;
-    }
-
-    status = fatx_write_fat(fs, cluster, fat_entry);
-    if (status != FATX_STATUS_SUCCESS)
-    {
-        /* An error occured. */
-        return status;
     }
 
     return FATX_STATUS_SUCCESS;
@@ -192,7 +149,7 @@ int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, size_
 {
     fatx_debug(fs, "fatx_cluster_number_to_byte_offset - cluster = %zd\n", cluster);
 
-    if (cluster < FATX_FAT_RESERVED_ENTRIES_COUNT || cluster >= fs->num_clusters)
+    if (!fatx_cluster_valid(fs, cluster))
     {
         fatx_error(fs, "cluster number out of range %zd\n", cluster);
         return FATX_STATUS_ERROR;
@@ -235,7 +192,7 @@ int fatx_get_next_cluster(struct fatx_fs *fs, size_t *cluster)
 int fatx_mark_cluster_available(struct fatx_fs *fs, size_t cluster)
 {
     fatx_debug(fs, "fatx_mark_cluster_available(cluster=%zd)\n", cluster);
-    fatx_set_fat_entry_for_cluster(fs, cluster, 0);
+    fatx_write_fat(fs, cluster, 0);
     return FATX_STATUS_SUCCESS;
 }
 
@@ -247,11 +204,11 @@ int fatx_mark_cluster_end(struct fatx_fs *fs, size_t cluster)
     fatx_debug(fs, "fatx_mark_cluster_end(cluster=%zd)\n", cluster);
     if (fs->fat_type == FATX_FAT_TYPE_16)
     {
-        fatx_set_fat_entry_for_cluster(fs, cluster, 0xffff);
+        fatx_write_fat(fs, cluster, 0xffff);
     }
     else
     {
-        fatx_set_fat_entry_for_cluster(fs, cluster, 0x0fffffff);
+        fatx_write_fat(fs, cluster, 0x0fffffff);
     }
     return FATX_STATUS_SUCCESS;
 }
@@ -301,10 +258,10 @@ int fatx_alloc_cluster(struct fatx_fs *fs, size_t *cluster)
 
     for (i=2; 1; i++)
     {
-        status = fatx_get_fat_entry_for_cluster(fs, i, &fat_entry);
+        status = fatx_read_fat(fs, i, &fat_entry);
         if (status != FATX_STATUS_SUCCESS)
         {
-            fatx_error(fs, "fatx_get_fat_entry_for_cluster returned status=%d, fat_entry = 0x%x\n", status, fat_entry);
+            fatx_error(fs, "fatx_read_fat returned status=%d, fat_entry = 0x%x\n", status, fat_entry);
             return status;
         }
 
@@ -334,10 +291,10 @@ int fatx_attach_cluster(struct fatx_fs *fs, size_t tail, size_t cluster)
 
     fatx_debug(fs, "fatx_attach_cluster(tail=%zd, cluster=%zd)\n", tail, cluster);
 
-    status = fatx_get_fat_entry_for_cluster(fs, tail, &fat_entry);
+    status = fatx_read_fat(fs, tail, &fat_entry);
     if (status != FATX_STATUS_SUCCESS)
     {
-        fatx_error(fs, "fatx_get_fat_entry_for_cluster returned status=%d, fat_entry = 0x%x\n", status, fat_entry);
+        fatx_error(fs, "fatx_read_fat returned status=%d, fat_entry = 0x%x\n", status, fat_entry);
         return status;
     }
 
@@ -348,7 +305,7 @@ int fatx_attach_cluster(struct fatx_fs *fs, size_t tail, size_t cluster)
         return FATX_STATUS_ERROR;
     }
 
-    status = fatx_set_fat_entry_for_cluster(fs, tail, cluster);
+    status = fatx_write_fat(fs, tail, cluster);
     if (status)
     {
         fatx_error(fs, "failed to set fat entry for cluster\n");

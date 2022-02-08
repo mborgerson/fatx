@@ -83,7 +83,9 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     fs->bytes_per_cluster = fs->cluster_size * fs->sector_size;
     fs->fat_offset        = fs->partition_offset+FATX_FAT_OFFSET;
 
-    if (fs->root_cluster > (fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT))
+    size_t cluster_limit = fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT;
+
+    if (fs->root_cluster >= cluster_limit)
     {
         fatx_error(fs, "root cluster %d exceeds cluster limit\n", fs->root_cluster);
         retval = -1;
@@ -93,12 +95,12 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     if (fs->num_clusters < 65525)
     {
         fs->fat_type = FATX_FAT_TYPE_16;
-        fs->fat_size = (fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT)*2;
+        fs->fat_size = cluster_limit*2;
     }
     else
     {
         fs->fat_type = FATX_FAT_TYPE_32;
-        fs->fat_size = (fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT)*4;
+        fs->fat_size = cluster_limit*4;
     }
 
     /* Round FAT size up to nearest 4k boundary. */
