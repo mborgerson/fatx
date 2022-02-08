@@ -1,17 +1,17 @@
 fatx
 ====
-* `libfatx` is a C library for working with the FATX filesystem, a variant of
+* **libfatx** is a C library for working with the FATX filesystem, a variant of
   FAT16/32 developed by Microsoft for the original Xbox console. It does not
   have the ability to create or format new drives yet.
-* `fatxfs` is a [FUSE userspace filesystem
+* **fatxfs** is a [FUSE userspace filesystem
   driver](https://en.wikipedia.org/wiki/Filesystem_in_Userspace) built using
   libfatx that enables you to mount a FATX filesystem on your host system and
   interact with it using your typical system tools.
-* `pyfatx` is a Python module providing bindings to libfatx.
+* **pyfatx** is a Python module providing bindings to libfatx.
 
 Status
 ------
-`libfatx` provides both read and write access to existing FATX formatted
+**libfatx** provides both read and write access to existing FATX formatted
 drives. It does not have the ability to create or format new drives.
 
 fatxfs: FUSE filesystem driver
@@ -39,7 +39,7 @@ Assuming you already have typical build tools installed, install FUSE and CMake:
 
     $ sudo apt-get install libfuse-dev cmake
 
-##### OS X
+##### macOS
 Download Xcode (available from the App Store) to get command line tools.
 
 Assuming you have homebrew installed, install `pkgconfig` and `cmake`:
