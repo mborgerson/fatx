@@ -29,9 +29,8 @@
  */
 int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size)
 {
-    int retval;
-
-    retval = 0;
+    int retval = 0;
+    size_t cluster_limit = 0;
 
     if (sector_size != 512 && sector_size != 4096)
     {
@@ -83,7 +82,7 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     fs->bytes_per_cluster = fs->sectors_per_cluster * fs->sector_size;
     fs->fat_offset        = fs->partition_offset+FATX_FAT_OFFSET;
 
-    size_t cluster_limit = fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT;
+    cluster_limit = fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT;
 
     if (fs->root_cluster >= cluster_limit)
     {
