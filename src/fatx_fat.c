@@ -97,7 +97,7 @@ int fatx_get_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_
 
     fatx_debug(fs, "fatx_get_fat_entry_for_cluster(cluster=%zd)\n", cluster);
 
-    if (cluster < 2 || cluster >= fs->num_clusters)
+    if (cluster < FATX_FAT_RESERVED_ENTRIES || cluster >= fs->num_clusters)
     {
         fatx_error(fs, "cluster number out of range\n");
         return -1;
@@ -122,7 +122,7 @@ int fatx_set_fat_entry_for_cluster(struct fatx_fs *fs, size_t cluster, fatx_fat_
 
     fatx_debug(fs, "fatx_set_fat_entry_for_cluster(cluster=%zd)\n", cluster);
 
-    if (cluster < 2 || cluster >= fs->num_clusters)
+    if (cluster < FATX_FAT_RESERVED_ENTRIES || cluster >= fs->num_clusters)
     {
         fatx_error(fs, "cluster number out of range\n");
         return -1;
@@ -199,17 +199,14 @@ int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, size_
         return FATX_STATUS_SUCCESS;
     }
 
-    if (cluster < 2 || cluster >= fs->num_clusters)
+    if (cluster < FATX_FAT_RESERVED_ENTRIES || cluster >= fs->num_clusters)
     {
         fatx_error(fs, "cluster number out of range %zd\n", cluster);
         return FATX_STATUS_ERROR;
     }
 
-    /* Clusters begin at index 2 */
-    cluster -= 2;
-
-    *offset  = fs->cluster_offset;
-    *offset += cluster * fs->bytes_per_cluster;
+    *offset = fs->cluster_offset
+              + (cluster - FATX_FAT_RESERVED_ENTRIES) * fs->bytes_per_cluster;
 
     return FATX_STATUS_SUCCESS;
 }
