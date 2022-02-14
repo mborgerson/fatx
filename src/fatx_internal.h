@@ -68,7 +68,7 @@
 
 /* FAT entry types (not the actual value of the entry). */
 #define FATX_CLUSTER_AVAILABLE       0
-#define FATX_CLUSTER_RESERVED        1
+#define FATX_CLUSTER_MEDIA           1
 #define FATX_CLUSTER_DATA            2
 #define FATX_CLUSTER_BAD             3
 #define FATX_CLUSTER_END             4

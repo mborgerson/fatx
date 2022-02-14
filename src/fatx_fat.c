@@ -206,39 +206,31 @@ int fatx_write_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry entry)
  */
 int fatx_get_fat_entry_type(struct fatx_fs *fs, fatx_fat_entry entry)
 {
+    /*
+     * Sign-extend a 16bit FATX entry to 32bit so that the same marker
+     * checking logic can be used in the switch table below.
+     *   eg. 0xFFF8 --> 0xFFFFFFF8
+     */
     if (fs->fat_type == FATX_FAT_TYPE_16)
     {
-        entry &= FATX_FAT16_ENTRY_MASK;
-        switch (entry)
-        {
-            case 0x0000:
-                return FATX_CLUSTER_AVAILABLE;
-            case 0xfff0:
-                return FATX_CLUSTER_RESERVED;
-            case 0xfff7:
-                return FATX_CLUSTER_BAD;
-            case 0xfff8:
-                return FATX_CLUSTER_DATA;
-            case 0xffff:
-                return FATX_CLUSTER_END;
-        }
+        entry = (int32_t)((int16_t)entry);
     }
-    else
+
+    switch (entry)
     {
-        entry &= FATX_FAT32_ENTRY_MASK;
-        switch (entry)
-        {
-            case 0x00000000:
-                return FATX_CLUSTER_AVAILABLE;
-            case 0xfffffff0:
-                return FATX_CLUSTER_RESERVED;
-            case 0xfffffff7:
-                return FATX_CLUSTER_BAD;
-            case 0xfffffff8:
-                return FATX_CLUSTER_DATA;
-            case 0xffffffff:
-                return FATX_CLUSTER_END;
-        }
+        case 0x00000000:
+            return FATX_CLUSTER_AVAILABLE;
+        case 0xfffffff7:
+            return FATX_CLUSTER_BAD;
+        case 0xfffffff8:
+            return FATX_CLUSTER_MEDIA;
+        case 0xffffffff:
+            return FATX_CLUSTER_END;
+    }
+
+    if (entry <= 0xfffffff0)
+    {
+        return FATX_CLUSTER_DATA;
     }
 
     return FATX_CLUSTER_INVALID;
