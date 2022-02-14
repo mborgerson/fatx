@@ -22,14 +22,8 @@
 
 #include "fatx.h"
 
-/* Offset of the filesystem signature, in bytes. */
-#define FATX_SIGNATURE_OFFSET        0
-
 /* FATX filesystem signature ('FATX') */
 #define FATX_SIGNATURE               0x58544146
-
-/* Offset of the superblock, in bytes. */
-#define FATX_SUPERBLOCK_OFFSET       4
 
 /* Size of the superblock, in bytes. */
 #define FATX_SUPERBLOCK_SIZE         4096
@@ -46,7 +40,7 @@
 
 /* Mask to be applied when reading FAT entry values. */
 #define FATX_FAT16_ENTRY_MASK        0x0000ffff
-#define FATX_FAT32_ENTRY_MASK        0x0fffffff
+#define FATX_FAT32_ENTRY_MASK        0xffffffff
 
 /* Markers used in the filename_size field of the directory entry. */
 #define FATX_DELETED_FILE_MARKER     0xe5
@@ -88,10 +82,12 @@
  */
 #pragma pack(1)
 struct fatx_superblock {
+    uint32_t signature;
     uint32_t volume_id;
     uint32_t sectors_per_cluster;
-    uint16_t root_cluster;
-    uint32_t unknown1;
+    uint32_t root_cluster;
+    uint16_t unknown1;
+    uint8_t  padding[4078];
 };
 #pragma pack()
 
@@ -118,7 +114,9 @@ typedef uint32_t fatx_fat_entry;
 
 /* Partition Functions */
 int fatx_check_partition_signature(struct fatx_fs *fs);
-int fatx_process_superblock(struct fatx_fs *fs);
+int fatx_init_superblock(struct fatx_fs *fs, size_t sectors_per_cluster);
+int fatx_read_superblock(struct fatx_fs *fs);
+int fatx_write_superblock(struct fatx_fs *fs);
 
 /* Device Functions */
 int fatx_dev_seek(struct fatx_fs *fs, off_t offset);
@@ -127,6 +125,8 @@ size_t fatx_dev_read(struct fatx_fs *fs, void *buf, size_t size, size_t items);
 size_t fatx_dev_write(struct fatx_fs *fs, const void *buf, size_t size, size_t items);
 
 /* FAT Functions */
+int fatx_init_fat(struct fatx_fs *fs);
+int fatx_init_root(struct fatx_fs *fs);
 int fatx_read_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry *entry);
 int fatx_write_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry entry);
 int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, size_t *offset);

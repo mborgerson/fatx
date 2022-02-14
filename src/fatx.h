@@ -23,6 +23,7 @@
 #define _XOPEN_SOURCE 500
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -41,6 +42,9 @@
 #define FATX_STATUS_SUCCESS          0
 #define FATX_STATUS_FILE_DELETED     1
 #define FATX_STATUS_END_OF_DIR       2
+
+#define FATX_RETAIL_CLUSTER_SIZE     16 * 1024
+#define FATX_RETAIL_PARTITION_COUNT  5
 
 struct fatx_fs {
     char const *device_path;
@@ -90,7 +94,24 @@ struct fatx_attr {
     struct fatx_ts accessed;
 };
 
-int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size);
+/*
+ * Xbox Harddisk Partition Map
+ */
+
+struct fatx_partition_map_entry {
+    char   letter;
+    size_t offset;
+    size_t size;
+};
+
+enum fatx_format {
+    FATX_FORMAT_NONE,
+    FATX_FORMAT_RETAIL,
+    FATX_FORMAT_F_TAKES_ALL
+};
+
+/* FATX Functions */
+int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size, size_t sectors_per_cluster);
 int fatx_close_device(struct fatx_fs *fs);
 int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir);
 int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *entry, struct fatx_attr *attr, struct fatx_dirent **result);
@@ -112,5 +133,11 @@ int fatx_truncate(struct fatx_fs *fs, char const *path, off_t offset);
 int fatx_rename(struct fatx_fs *fs, char const *from, char const *to);
 void fatx_time_t_to_fatx_ts(const time_t in, struct fatx_ts *out);
 time_t fatx_ts_to_time_t(struct fatx_ts *in);
+
+/* Disk Functions */
+int fatx_disk_size(char const *path, uint64_t *size);
+int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, enum fatx_format format_type, size_t sectors_per_cluster);
+int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster);
+int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size);
 
 #endif

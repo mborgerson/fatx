@@ -27,7 +27,7 @@
 /*
  * Open a device.
  */
-int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size)
+int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size, size_t sectors_per_cluster)
 {
     int retval = 0;
     size_t cluster_limit = 0;
@@ -35,20 +35,20 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     if (sector_size != 512 && sector_size != 4096)
     {
         fatx_error(fs, "expected sector size to be 512 or 4096, got %d\n", sector_size);
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     /* Sanity check partition offset and size. */
     if (offset % sector_size)
     {
         fatx_error(fs, "specified partition offset does not reside on sector boundary (%d bytes)\n", sector_size);
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     if (size % sector_size)
     {
         fatx_error(fs, "specified partition size does not reside on sector boundary (%d bytes)\n", sector_size);
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     fs->device_path      = path;
@@ -60,38 +60,64 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     if (!fs->device)
     {
         fatx_error(fs, "failed to open %s for reading and writing\n", path);
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
-    /* Check signature. */
-    if (fatx_check_partition_signature(fs))
+    /* Initialize device with existing FATX superblock. */
+    if (sectors_per_cluster == 0)
     {
-        retval = -1;
-        goto cleanup;
+        if (fatx_check_partition_signature(fs) || fatx_read_superblock(fs))
+        {
+            retval = FATX_STATUS_ERROR;
+            goto cleanup;
+        }
     }
 
-    /* Process superblock. */
-    if (fatx_process_superblock(fs))
+    /* Initialize device with a new FATX superblock. */
+    else
     {
-        retval = -1;
-        goto cleanup;
+        if (fatx_init_superblock(fs, sectors_per_cluster))
+        {
+            retval = FATX_STATUS_ERROR;
+            goto cleanup;
+        }
+    }
+
+    /* Validate that an acceptable cluster+sector combo was configured */
+    switch (fs->sectors_per_cluster)
+    {
+        case 1:
+        case 2:
+        case 4:
+        case 8:
+        case 16:
+        case 32:
+        case 64:
+        case 128:
+            break;
+
+        default:
+            fatx_error(fs, "%d sectors per cluster exceeds limit\n", fs->sectors_per_cluster);
+            retval = FATX_STATUS_ERROR;
+            goto cleanup;
     }
 
     fs->num_sectors       = fs->partition_size / fs->sector_size;
     fs->num_clusters      = fs->num_sectors / fs->sectors_per_cluster;
     fs->bytes_per_cluster = fs->sectors_per_cluster * fs->sector_size;
-    fs->fat_offset        = fs->partition_offset+FATX_FAT_OFFSET;
+    fs->fat_offset        = fs->partition_offset + FATX_FAT_OFFSET;
 
     cluster_limit = fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT;
 
     if (fs->root_cluster >= cluster_limit)
     {
         fatx_error(fs, "root cluster %d exceeds cluster limit\n", fs->root_cluster);
-        retval = -1;
+        retval = FATX_STATUS_ERROR;
         goto cleanup;
     }
 
-    if (fs->num_clusters < 65525)
+    /* NOTE: this *MUST* be kept below the Cluster Reserved marker for FAT16 */
+    if (fs->num_clusters < 0xfff0)
     {
         fs->fat_type = FATX_FAT_TYPE_16;
         fs->fat_size = cluster_limit*2;
@@ -120,6 +146,7 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     fatx_info(fs, "  # of Sectors:        %d\n",          fs->num_sectors);
     fatx_info(fs, "  Sectors per Cluster: %d\n",          fs->sectors_per_cluster);
     fatx_info(fs, "  # of Clusters:       %d\n",          fs->num_clusters);
+    fatx_info(fs, "  Bytes per Cluster:   %d\n",          fs->bytes_per_cluster);
     fatx_info(fs, "  FAT Offset:          0x%zx bytes\n", fs->fat_offset);
     fatx_info(fs, "  FAT Size:            0x%zx bytes\n", fs->fat_size);
     fatx_info(fs, "  FAT Type:            %s\n",          fs->fat_type == FATX_FAT_TYPE_16 ? "16" : "32");
@@ -140,4 +167,34 @@ int fatx_close_device(struct fatx_fs *fs)
 {
     fclose(fs->device);
     return FATX_STATUS_SUCCESS;
+}
+
+/*
+ * Return the disk length (in bytes).
+ */
+int fatx_disk_size(char const *path, uint64_t *size)
+{
+    FILE * device;
+    int retval;
+
+    device = fopen(path, "r");
+    if (!device)
+    {
+        fprintf(stderr, "failed to open %s for size query\n", path);
+        return FATX_STATUS_ERROR;
+    }
+
+    if (fseek(device, 0, SEEK_END))
+    {
+        fprintf(stderr, "failed to seek to end of disk\n");
+        retval = FATX_STATUS_ERROR;
+        goto cleanup;
+    }
+
+    *size = ftell(device);
+    retval = FATX_STATUS_SUCCESS;
+
+cleanup:
+    fclose(device);
+    return retval;
 }

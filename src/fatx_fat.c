@@ -20,10 +20,116 @@
 #include <stdbool.h>
 #include "fatx_internal.h"
 
+#define MAX_WRITE_SIZE 1024 * 1024 * 8 // 8mb
+
 static bool fatx_cluster_valid(struct fatx_fs *fs, size_t cluster)
 {
-    return (cluster >= FATX_FAT_RESERVED_ENTRIES_COUNT) &&
+    return (cluster >= 0) &&
            (cluster < fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT);
+}
+
+/*
+ * Initialize a blank FAT.
+ */
+int fatx_init_fat(struct fatx_fs *fs)
+{
+    int64_t bytes_remaining;
+    uint8_t *chunk;
+    size_t chunk_size;
+    int retval = FATX_STATUS_SUCCESS;
+
+    if (fatx_dev_seek(fs, fs->fat_offset))
+    {
+        fatx_error(fs, "failed to seek to FAT start (offset 0x%zx)\n", fs->fat_offset);
+        return FATX_STATUS_ERROR;
+    }
+
+    bytes_remaining = fs->fat_size;
+
+    /*
+     * A FAT could span multiple gigabytes with a large partition using small
+     * clusters, so we cap how much memory we allocate for chunked writes to
+     * zero out the FAT table.
+     */
+    if (bytes_remaining > MAX_WRITE_SIZE)
+    {
+        chunk_size = MAX_WRITE_SIZE;
+    }
+    else
+    {
+        chunk_size = bytes_remaining;
+    }
+
+    chunk = malloc(chunk_size);
+    if (!chunk)
+    {
+        fatx_error(fs, "failed to initialize memory for FAT wipe\n");
+        return FATX_STATUS_ERROR;
+    }
+    memset(chunk, 0x00, chunk_size);
+
+    while (bytes_remaining > 0)
+    {
+        if (bytes_remaining > chunk_size)
+        {
+            if(fatx_dev_write(fs, chunk, 1, chunk_size) != chunk_size)
+            {
+                fatx_error(fs, "failed to clear FAT chunk (offset 0x%zx)\n", fs->fat_offset + (bytes_remaining - fs->fat_size));
+                retval = FATX_STATUS_ERROR;
+                goto cleanup;
+            }
+        }
+        else
+        {
+            if(fatx_dev_write(fs, chunk, 1, bytes_remaining) != bytes_remaining)
+            {
+                fatx_error(fs, "failed to clear final FAT chunk (offset 0x%zx, br 0x%zx)\n", fs->fat_offset + (bytes_remaining - fs->fat_size), bytes_remaining);
+                retval = FATX_STATUS_ERROR;
+                goto cleanup;
+            }
+        }
+        bytes_remaining -= chunk_size;
+    }
+
+cleanup:
+    free(chunk);
+    return retval;
+}
+
+/*
+ * Initialize the root directory.
+ */
+int fatx_init_root(struct fatx_fs *fs)
+{
+    uint8_t *chunk;
+    int retval = FATX_STATUS_SUCCESS;
+
+    if (fatx_write_fat(fs, 0, 0xfffffff8) || fatx_mark_cluster_end(fs, 1))
+    {
+        fatx_error(fs, "failed to initialize FAT with root entries\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    chunk = malloc(fs->bytes_per_cluster);
+    memset(chunk, FATX_END_OF_DIR_MARKER, fs->bytes_per_cluster);
+
+    if (fatx_dev_seek(fs, fs->cluster_offset))
+    {
+        fatx_error(fs, " - failed to seek to root directory cluster\n");
+        retval = FATX_STATUS_ERROR;
+        goto cleanup;
+    }
+
+    if (fatx_dev_write(fs, chunk, fs->bytes_per_cluster, 1) != 1)
+    {
+        fatx_error(fs, " - failed to initialize root cluster\n");
+        retval = FATX_STATUS_ERROR;
+        goto cleanup;
+    }
+
+cleanup:
+    free(chunk);
+    return retval;
 }
 
 /*
@@ -103,40 +209,36 @@ int fatx_get_fat_entry_type(struct fatx_fs *fs, fatx_fat_entry entry)
     if (fs->fat_type == FATX_FAT_TYPE_16)
     {
         entry &= FATX_FAT16_ENTRY_MASK;
-
-        if (entry == 0)
-            return FATX_CLUSTER_AVAILABLE;
-
-        if (entry == 1)
-            return FATX_CLUSTER_RESERVED;
-
-        if (entry >= FATX_FAT_RESERVED_ENTRIES_COUNT && entry <= 0xfff6)
-            return FATX_CLUSTER_DATA;
-
-        if (entry == 0xfff7)
-            return FATX_CLUSTER_BAD;
-
-        if (entry >= 0xfff8 && entry <= 0xffff)
-            return FATX_CLUSTER_END;
+        switch (entry)
+        {
+            case 0x0000:
+                return FATX_CLUSTER_AVAILABLE;
+            case 0xfff0:
+                return FATX_CLUSTER_RESERVED;
+            case 0xfff7:
+                return FATX_CLUSTER_BAD;
+            case 0xfff8:
+                return FATX_CLUSTER_DATA;
+            case 0xffff:
+                return FATX_CLUSTER_END;
+        }
     }
     else
     {
         entry &= FATX_FAT32_ENTRY_MASK;
-
-        if (entry == 0)
-            return FATX_CLUSTER_AVAILABLE;
-
-        if (entry == 1)
-            return FATX_CLUSTER_RESERVED;
-
-        if (entry >= FATX_FAT_RESERVED_ENTRIES_COUNT && entry <= 0x0ffffff6)
-            return FATX_CLUSTER_DATA;
-
-        if (entry == 0x0ffffff7)
-            return FATX_CLUSTER_BAD;
-
-        if (entry >= 0x0ffffff8 && entry <= 0x0fffffff)
-            return FATX_CLUSTER_END;
+        switch (entry)
+        {
+            case 0x00000000:
+                return FATX_CLUSTER_AVAILABLE;
+            case 0xfffffff0:
+                return FATX_CLUSTER_RESERVED;
+            case 0xfffffff7:
+                return FATX_CLUSTER_BAD;
+            case 0xfffffff8:
+                return FATX_CLUSTER_DATA;
+            case 0xffffffff:
+                return FATX_CLUSTER_END;
+        }
     }
 
     return FATX_CLUSTER_INVALID;
@@ -208,7 +310,7 @@ int fatx_mark_cluster_end(struct fatx_fs *fs, size_t cluster)
     }
     else
     {
-        fatx_write_fat(fs, cluster, 0x0fffffff);
+        fatx_write_fat(fs, cluster, 0xffffffff);
     }
     return FATX_STATUS_SUCCESS;
 }
