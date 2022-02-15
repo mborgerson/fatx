@@ -97,7 +97,7 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
             break;
 
         default:
-            fatx_error(fs, "%d sectors per cluster exceeds limit\n", fs->sectors_per_cluster);
+            fatx_error(fs, "invalid sectors per cluster %d\n", fs->sectors_per_cluster);
             retval = FATX_STATUS_ERROR;
             goto cleanup;
     }

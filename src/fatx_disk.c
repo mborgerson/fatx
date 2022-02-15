@@ -19,12 +19,13 @@
 
 #include "fatx_internal.h"
 
-struct fatx_partition_map_entry const fatx_fuse_partition_map[FATX_RETAIL_PARTITION_COUNT] = {
+struct fatx_partition_map_entry const fatx_partition_map[FATX_RETAIL_PARTITION_COUNT] = {
     { .letter = 'x',    .offset = 0x00080000, .size = 0x02ee00000 },
     { .letter = 'y',    .offset = 0x2ee80000, .size = 0x02ee00000 },
     { .letter = 'z',    .offset = 0x5dc80000, .size = 0x02ee00000 },
     { .letter = 'c',    .offset = 0x8ca80000, .size = 0x01f400000 },
     { .letter = 'e',    .offset = 0xabe80000, .size = 0x1312d6000 },
+  //{ .letter = 'f',    .offset = 0x1dd15600, .size = 0x000000000 },
 };
 
 /*
@@ -36,7 +37,7 @@ int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size)
 
     for (int i = 0; i < FATX_RETAIL_PARTITION_COUNT; i++)
     {
-        pi = &fatx_fuse_partition_map[i];
+        pi = &fatx_partition_map[i];
 
         if (pi->letter == drive_letter)
         {
@@ -62,10 +63,9 @@ int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, e
         return FATX_STATUS_SUCCESS;
     }
 
-    /* Always (re-)format device with retail partitions */
     for (int i = 0; i < FATX_RETAIL_PARTITION_COUNT; i++)
     {
-        pi = &fatx_fuse_partition_map[i];
+        pi = &fatx_partition_map[i];
 
         fatx_info(fs, "-------------------------------------------\n");
         fatx_info(fs, "Formatting partition %u (%c drive) ...\n", i, pi->letter);
@@ -78,22 +78,18 @@ int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, e
          * configure the cluster size on retail partitions or many games
          * will not load. Adjusting sector sizes, however, is okay.
          */
-
         if (fatx_disk_format_partition(fs, path, pi->offset, pi->size, sector_size, FATX_RETAIL_CLUSTER_SIZE / sector_size))
         {
             fatx_error(fs, " - failed to format partition %d\n", i);
             return FATX_STATUS_ERROR;
         }
-
     }
 
-    /* Retail formatting already complete, nothing else to do */
     if (format_type == FATX_FORMAT_RETAIL)
     {
         return FATX_STATUS_SUCCESS;
     }
 
-    /* Format F partition, in addition to retail partitions */
     else if (format_type == FATX_FORMAT_F_TAKES_ALL)
     {
         fatx_info(fs, "-------------------------------------------\n");
@@ -124,21 +120,18 @@ int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, uint64_t of
         return FATX_STATUS_ERROR;
     }
 
-    /* Overwrite the partition superblock with default values */
     if (fatx_write_superblock(fs))
     {
         retval = FATX_STATUS_ERROR;
         goto cleanup;
     }
 
-    /* Overwrite the partition FAT */
     if (fatx_init_fat(fs))
     {
         retval = FATX_STATUS_ERROR;
         goto cleanup;
     }
 
-    /* Overwrite partition root directory cluster */
     if (fatx_init_root(fs))
     {
         retval = FATX_STATUS_ERROR;

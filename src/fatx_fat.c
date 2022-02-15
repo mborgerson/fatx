@@ -20,8 +20,6 @@
 #include <stdbool.h>
 #include "fatx_internal.h"
 
-#define MAX_WRITE_SIZE 1024 * 1024 * 8 // 8mb
-
 static bool fatx_cluster_valid(struct fatx_fs *fs, size_t cluster)
 {
     return (cluster >= 0) &&
@@ -44,22 +42,13 @@ int fatx_init_fat(struct fatx_fs *fs)
         return FATX_STATUS_ERROR;
     }
 
-    bytes_remaining = fs->fat_size;
-
     /*
-     * A FAT could span multiple gigabytes with a large partition using small
-     * clusters, so we cap how much memory we allocate for chunked writes to
-     * zero out the FAT table.
+     * A FAT could span multiple gigabytes with a very large partition (tbs)
+     * using small clusters, so we want to create a relatively large zero
+     * buffer in those cases while still capping how much memory we allocate
+     * for the chunked writes to zero out the FAT table.
      */
-    if (bytes_remaining > MAX_WRITE_SIZE)
-    {
-        chunk_size = MAX_WRITE_SIZE;
-    }
-    else
-    {
-        chunk_size = bytes_remaining;
-    }
-
+    chunk_size = MAX(0x4000, (fs->fat_size >> 8));
     chunk = malloc(chunk_size);
     if (!chunk)
     {
@@ -68,27 +57,17 @@ int fatx_init_fat(struct fatx_fs *fs)
     }
     memset(chunk, 0x00, chunk_size);
 
+    bytes_remaining = fs->fat_size;
     while (bytes_remaining > 0)
     {
-        if (bytes_remaining > chunk_size)
+        size_t bytes_to_write = MIN(chunk_size, bytes_remaining);
+        if(fatx_dev_write(fs, chunk, bytes_to_write, 1) != 1)
         {
-            if(fatx_dev_write(fs, chunk, 1, chunk_size) != chunk_size)
-            {
-                fatx_error(fs, "failed to clear FAT chunk (offset 0x%zx)\n", fs->fat_offset + (bytes_remaining - fs->fat_size));
-                retval = FATX_STATUS_ERROR;
-                goto cleanup;
-            }
+            fatx_error(fs, "failed to clear FAT chunk (offset 0x%zx)\n", fs->fat_offset + (bytes_remaining - fs->fat_size));
+            retval = FATX_STATUS_ERROR;
+            goto cleanup;
         }
-        else
-        {
-            if(fatx_dev_write(fs, chunk, 1, bytes_remaining) != bytes_remaining)
-            {
-                fatx_error(fs, "failed to clear final FAT chunk (offset 0x%zx, br 0x%zx)\n", fs->fat_offset + (bytes_remaining - fs->fat_size), bytes_remaining);
-                retval = FATX_STATUS_ERROR;
-                goto cleanup;
-            }
-        }
-        bytes_remaining -= chunk_size;
+        bytes_remaining -= bytes_to_write;
     }
 
 cleanup:
@@ -104,7 +83,7 @@ int fatx_init_root(struct fatx_fs *fs)
     uint8_t *chunk;
     int retval = FATX_STATUS_SUCCESS;
 
-    if (fatx_write_fat(fs, 0, 0xfffffff8) || fatx_mark_cluster_end(fs, 1))
+    if (fatx_write_fat(fs, 0, 0xfffffff8) || fatx_mark_cluster_end(fs, fs->root_cluster))
     {
         fatx_error(fs, "failed to initialize FAT with root entries\n");
         return FATX_STATUS_ERROR;

@@ -38,10 +38,6 @@
 /* Number of reserved entries in the FAT. */
 #define FATX_FAT_RESERVED_ENTRIES_COUNT 1
 
-/* Mask to be applied when reading FAT entry values. */
-#define FATX_FAT16_ENTRY_MASK        0x0000ffff
-#define FATX_FAT32_ENTRY_MASK        0xffffffff
-
 /* Markers used in the filename_size field of the directory entry. */
 #define FATX_DELETED_FILE_MARKER     0xe5
 #define FATX_END_OF_DIR_MARKER       0xff
@@ -76,6 +72,7 @@
 
 /* Helpful macros. */
 #define MIN(a,b) ( ( (a) <= (b) ) ? (a) : (b) )
+#define MAX(a,b) ( ( (a) >= (b) ) ? (a) : (b) )
 
 /*
  * The superblock, as it appears on disk.
@@ -90,6 +87,7 @@ struct fatx_superblock {
     uint8_t  padding[4078];
 };
 #pragma pack()
+_Static_assert(sizeof(struct fatx_superblock) == 4096, "fatx_superblock struct *must* be 4096 bytes");
 
 /*
  * The directory entry as it appears on disk.

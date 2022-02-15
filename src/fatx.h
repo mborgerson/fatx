@@ -43,7 +43,7 @@
 #define FATX_STATUS_FILE_DELETED     1
 #define FATX_STATUS_END_OF_DIR       2
 
-#define FATX_RETAIL_CLUSTER_SIZE     16 * 1024
+#define FATX_RETAIL_CLUSTER_SIZE     (16 * 1024)
 #define FATX_RETAIL_PARTITION_COUNT  5
 
 struct fatx_fs {
