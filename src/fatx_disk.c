@@ -19,13 +19,18 @@
 
 #include "fatx_internal.h"
 
-struct fatx_partition_map_entry const fatx_partition_map[FATX_RETAIL_PARTITION_COUNT] = {
+struct fatx_partition_map_entry const fatx_partition_map[] = {
+
+    /* Retail partitions */
     { .letter = 'x',    .offset = 0x00080000, .size = 0x02ee00000 },
     { .letter = 'y',    .offset = 0x2ee80000, .size = 0x02ee00000 },
     { .letter = 'z',    .offset = 0x5dc80000, .size = 0x02ee00000 },
     { .letter = 'c',    .offset = 0x8ca80000, .size = 0x01f400000 },
     { .letter = 'e',    .offset = 0xabe80000, .size = 0x1312d6000 },
-  //{ .letter = 'f',    .offset = 0x1dd15600, .size = 0x000000000 },
+
+    /* Extended (non-retail) partitions commonly used in homebrew */
+    { .letter = 'f',    .offset = 0x1dd156000, .size = -1 },
+
 };
 
 /*
@@ -35,7 +40,7 @@ int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size)
 {
     struct fatx_partition_map_entry const *pi;
 
-    for (int i = 0; i < FATX_RETAIL_PARTITION_COUNT; i++)
+    for (int i = 0; i < sizeof(fatx_partition_map); i++)
     {
         pi = &fatx_partition_map[i];
 
@@ -53,7 +58,7 @@ int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size)
 /*
  * Return the disk size (in bytes).
  */
-int fatx_disk_size(char const *path, uint64_t *size)
+int fatx_disk_size(char const *path, size_t *size)
 {
     FILE * device;
     int retval;
@@ -81,12 +86,34 @@ cleanup:
 }
 
 /*
+ * Return the remaining disk size (in bytes).
+ */
+int fatx_disk_size_remaining(char const *path, size_t offset, size_t *remaining_size)
+{
+    size_t disk_size;
+
+    if (fatx_disk_size(path, &disk_size))
+    {
+        return FATX_STATUS_ERROR;
+    }
+
+    if (offset > disk_size)
+    {
+        fprintf(stderr, "invalid disk offset\n");
+        return FATX_STATUS_ERROR;
+    }
+
+    *remaining_size = disk_size - offset;
+    return FATX_STATUS_SUCCESS;
+}
+
+/*
  * Reformat a disk as FATX.
  */
 int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, enum fatx_format format_type, size_t sectors_per_cluster)
 {
     struct fatx_partition_map_entry const *pi;
-    uint64_t f_offset, f_size, disk_size;
+    size_t f_offset, f_size;
 
     if (format_type == FATX_FORMAT_NONE)
     {
@@ -104,7 +131,7 @@ int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, e
         pi = &fatx_partition_map[i];
 
         fatx_info(fs, "-------------------------------------------\n");
-        fatx_info(fs, "Formatting partition %u (%c drive) ...\n", i, pi->letter);
+        fatx_info(fs, "Formatting partition %d (%c drive) ...\n", i, pi->letter);
 
         /*
          * Xapi initialization validates that the cluster size of retail
@@ -128,21 +155,16 @@ int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, e
 
     else if (format_type == FATX_FORMAT_F_TAKES_ALL)
     {
-        fatx_info(fs, "-------------------------------------------\n");
-        fatx_info(fs, "Formatting partition %u (%c drive) ...\n", 6, 'f');
+        fatx_drive_to_offset_size('f', &f_offset, &f_size);
 
-        f_offset = pi->offset + pi->size;
-        if (fatx_disk_size(path, &disk_size))
+        fatx_info(fs, "-------------------------------------------\n");
+        fatx_info(fs, "Formatting partition %d (%c drive) ...\n", 5, 'f');
+
+        if (fatx_disk_format_partition(fs, path, f_offset, f_size, sector_size, sectors_per_cluster))
         {
-            fatx_error(fs, " - failed to get disk size\n");
+            fatx_error(fs, " - failed to format partition %d (f-takes-all)\n", 5);
             return FATX_STATUS_ERROR;
         }
-
-        /* Round remaining disk space down to nearest sector boundary */
-        f_size = disk_size - f_offset;
-        f_size &= ~(sector_size - 1);
-
-        fatx_disk_format_partition(fs, path, f_offset, f_size, sector_size, sectors_per_cluster);
     }
 
     return FATX_STATUS_SUCCESS;
@@ -151,7 +173,7 @@ int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, e
 /*
  * Format partition.
  */
-int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster)
+int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size, size_t sectors_per_cluster)
 {
     int retval;
 

@@ -610,7 +610,7 @@ void fatx_fuse_print_usage(void)
     /* Print basic usage */
     fprintf(stderr, "FATXFS - Userspace FATX Filesystem Driver\n\n");
     fprintf(stderr, "Usage: %s <device> <mountpoint> [<options>]\n", prog_short_name);
-    fprintf(stderr, "   or: %s <device> <mountpoint> --drive=c|e|x|y|z [<options>]\n", prog_short_name);
+    fprintf(stderr, "   or: %s <device> <mountpoint> --drive=c|e|x|y|z|f [<options>]\n", prog_short_name);
     fprintf(stderr, "   or: %s <device> <mountpoint> --offset=<offset> --size=<size> [<options>]\n\n", prog_short_name);
     fprintf(stderr, "General options:\n"
                     "    -o opt, [opt...]               mount options\n"

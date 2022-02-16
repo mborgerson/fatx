@@ -38,11 +38,21 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
         return FATX_STATUS_ERROR;
     }
 
-    /* Sanity check partition offset and size. */
     if (offset % sector_size)
     {
-        fatx_error(fs, "specified partition offset does not reside on sector boundary (%d bytes)\n", sector_size);
+        fatx_error(fs, "specified partition offset (0x%zx) does not reside on sector boundary (%d bytes)\n", offset, sector_size);
         return FATX_STATUS_ERROR;
+    }
+
+    /* Compute partition size as remaining disk space */
+    if (size == -1)
+    {
+        if(fatx_disk_size_remaining(path, offset, &size))
+        {
+            fatx_error(fs, "failed to resolve partition size");
+            return FATX_STATUS_ERROR;
+        }
+        size &= ~(sector_size - 1);
     }
 
     if (size % sector_size)
