@@ -88,7 +88,7 @@ def ffibuilder():
 
         struct fatx_fs *pyfatx_open_helper(void);
 
-        int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size);
+        int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size, size_t sectors_per_cluster);
         int fatx_close_device(struct fatx_fs *fs);
         int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir);
         int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *entry, struct fatx_attr *attr, struct fatx_dirent **result);
