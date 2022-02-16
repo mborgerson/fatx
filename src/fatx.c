@@ -63,24 +63,9 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
         return FATX_STATUS_ERROR;
     }
 
-    /* Initialize device with existing FATX superblock. */
-    if (sectors_per_cluster == 0)
+    if (fatx_init_superblock(fs, sectors_per_cluster))
     {
-        if (fatx_check_partition_signature(fs) || fatx_read_superblock(fs))
-        {
-            retval = FATX_STATUS_ERROR;
-            goto cleanup;
-        }
-    }
-
-    /* Initialize device with a new FATX superblock. */
-    else
-    {
-        if (fatx_init_superblock(fs, sectors_per_cluster))
-        {
-            retval = FATX_STATUS_ERROR;
-            goto cleanup;
-        }
+        return FATX_STATUS_ERROR;
     }
 
     /* Validate that an acceptable cluster+sector combo was configured */

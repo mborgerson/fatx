@@ -46,6 +46,8 @@
 #define FATX_RETAIL_CLUSTER_SIZE     (16 * 1024)
 #define FATX_RETAIL_PARTITION_COUNT  5
 
+#define FATX_READ_FROM_SUPERBLOCK    0
+
 struct fatx_fs {
     char const *device_path;
     FILE       *device;

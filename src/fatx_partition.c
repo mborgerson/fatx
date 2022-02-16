@@ -26,26 +26,23 @@
 int fatx_check_partition_signature(struct fatx_fs *fs)
 {
     uint32_t signature;
-    size_t   read;
 
     if (fatx_dev_seek(fs, fs->partition_offset))
     {
         fatx_error(fs, "failed to seek to signature\n");
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
-    read = fatx_dev_read(fs, &signature, sizeof(uint32_t), 1);
-
-    if (read != 1)
+    if (fatx_dev_read(fs, &signature, sizeof(uint32_t), 1) != 1)
     {
         fatx_error(fs, "failed to read signature from device\n");
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     if (signature != FATX_SIGNATURE)
     {
         fatx_error(fs, "invalid signature\n");
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     return FATX_STATUS_SUCCESS;
@@ -58,10 +55,23 @@ int fatx_init_superblock(struct fatx_fs *fs, size_t sectors_per_cluster)
 {
     struct timeval time;
 
-    gettimeofday(&time, NULL);
-    fs->volume_id = time.tv_usec;
-    fs->root_cluster = 1;
-    fs->sectors_per_cluster = sectors_per_cluster;
+    /* Initialize device with existing FATX superblock. */
+    if (sectors_per_cluster == FATX_READ_FROM_SUPERBLOCK)
+    {
+        if (fatx_check_partition_signature(fs) || fatx_read_superblock(fs))
+        {
+            return FATX_STATUS_ERROR;
+        }
+    }
+
+    /* Initialize device with a new FATX superblock. */
+    else
+    {
+        gettimeofday(&time, NULL);
+        fs->volume_id = time.tv_usec;
+        fs->root_cluster = 1;
+        fs->sectors_per_cluster = sectors_per_cluster;
+    }
 
     return FATX_STATUS_SUCCESS;
 }
@@ -72,25 +82,23 @@ int fatx_init_superblock(struct fatx_fs *fs, size_t sectors_per_cluster)
 int fatx_read_superblock(struct fatx_fs *fs)
 {
     struct fatx_superblock superblock;
-    size_t read;
 
     if (fatx_dev_seek(fs, fs->partition_offset))
     {
         fatx_error(fs, "failed to seek to superblock\n");
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
-    read = fatx_dev_read(fs, &superblock, sizeof(struct fatx_superblock), 1);
-    if (read != 1)
+    if (fatx_dev_read(fs, &superblock, sizeof(struct fatx_superblock), 1) != 1)
     {
         fatx_error(fs, "failed to read superblock\n");
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     if (superblock.signature != FATX_SIGNATURE)
     {
         fatx_error(fs, "invalid signature\n");
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     fs->volume_id = superblock.volume_id;

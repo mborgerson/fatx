@@ -773,7 +773,7 @@ int main(int argc, char *argv[])
                               pd.mount_partition_offset,
                               pd.mount_partition_size,
                               pd.device_sector_size,
-                              0);
+                              FATX_READ_FROM_SUPERBLOCK);
     if (status)
     {
         fprintf(stderr, "failed to initialize the filesystem\n");
