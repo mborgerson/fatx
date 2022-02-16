@@ -168,33 +168,3 @@ int fatx_close_device(struct fatx_fs *fs)
     fclose(fs->device);
     return FATX_STATUS_SUCCESS;
 }
-
-/*
- * Return the disk length (in bytes).
- */
-int fatx_disk_size(char const *path, uint64_t *size)
-{
-    FILE * device;
-    int retval;
-
-    device = fopen(path, "r");
-    if (!device)
-    {
-        fprintf(stderr, "failed to open %s for size query\n", path);
-        return FATX_STATUS_ERROR;
-    }
-
-    if (fseek(device, 0, SEEK_END))
-    {
-        fprintf(stderr, "failed to seek to end of disk\n");
-        retval = FATX_STATUS_ERROR;
-        goto cleanup;
-    }
-
-    *size = ftell(device);
-    retval = FATX_STATUS_SUCCESS;
-
-cleanup:
-    fclose(device);
-    return retval;
-}

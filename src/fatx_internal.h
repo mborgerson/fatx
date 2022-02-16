@@ -22,6 +22,12 @@
 
 #include "fatx.h"
 
+/* FATX refurb info signature ('RFRB') */
+#define FATX_REFURB_SIGNATURE        0x42524652
+
+/* Offset of the refurb info on the physical disk */
+#define FATX_REFURB_OFFSET           0x600
+
 /* FATX filesystem signature ('FATX') */
 #define FATX_SIGNATURE               0x58544146
 
@@ -75,7 +81,18 @@
 #define MAX(a,b) ( ( (a) >= (b) ) ? (a) : (b) )
 
 /*
- * The superblock, as it appears on disk.
+ * The refurb info as it appears on disk.
+ */
+#pragma pack(1)
+struct fatx_refurb_info {
+    uint32_t signature;
+    uint32_t number_of_boots;
+    uint64_t first_power_on;
+};
+#pragma pack()
+
+/*
+ * The FATX superblock as it appears on disk.
  */
 #pragma pack(1)
 struct fatx_superblock {

@@ -139,5 +139,7 @@ int fatx_disk_size(char const *path, uint64_t *size);
 int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, enum fatx_format format_type, size_t sectors_per_cluster);
 int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster);
 int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size);
+int fatx_disk_read_refurb_info(char const *path);
+int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint64_t first_power_on);
 
 #endif

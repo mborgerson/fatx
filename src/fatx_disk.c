@@ -51,6 +51,36 @@ int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size)
 }
 
 /*
+ * Return the disk size (in bytes).
+ */
+int fatx_disk_size(char const *path, uint64_t *size)
+{
+    FILE * device;
+    int retval;
+
+    device = fopen(path, "r");
+    if (!device)
+    {
+        fprintf(stderr, "failed to open %s for size query\n", path);
+        return FATX_STATUS_ERROR;
+    }
+
+    if (fseek(device, 0, SEEK_END))
+    {
+        fprintf(stderr, "failed to seek to end of disk\n");
+        retval = FATX_STATUS_ERROR;
+        goto cleanup;
+    }
+
+    *size = ftell(device);
+    retval = FATX_STATUS_SUCCESS;
+
+cleanup:
+    fclose(device);
+    return retval;
+}
+
+/*
  * Reformat a disk as FATX.
  */
 int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, enum fatx_format format_type, size_t sectors_per_cluster)
@@ -61,6 +91,12 @@ int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, e
     if (format_type == FATX_FORMAT_NONE)
     {
         return FATX_STATUS_SUCCESS;
+    }
+
+    fatx_info(fs, "Writing refurb info...\n");
+    if (fatx_disk_write_refurb_info(path, 0, 0))
+    {
+        return FATX_STATUS_ERROR;
     }
 
     for (int i = 0; i < FATX_RETAIL_PARTITION_COUNT; i++)
@@ -101,7 +137,11 @@ int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, e
             fatx_error(fs, " - failed to get disk size\n");
             return FATX_STATUS_ERROR;
         }
+
+        /* Round remaining disk space down to nearest sector boundary */
         f_size = disk_size - f_offset;
+        f_size &= ~(sector_size - 1);
+
         fatx_disk_format_partition(fs, path, f_offset, f_size, sector_size, sectors_per_cluster);
     }
 
@@ -142,5 +182,91 @@ int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, uint64_t of
 
 cleanup:
     fatx_close_device(fs);
+    return retval;
+}
+
+/*
+ * Read refurb sector.
+ */
+int fatx_disk_read_refurb_info(char const *path)
+{
+    struct fatx_refurb_info refurb_info;
+    FILE * device;
+    int retval;
+
+    device = fopen(path, "r");
+    if (!device)
+    {
+        fprintf(stderr, "failed to open %s to read refurb info\n", path);
+        return FATX_STATUS_ERROR;
+    }
+
+    if (fseek(device, FATX_REFURB_OFFSET, SEEK_END))
+    {
+        fprintf(stderr, "failed to seek to the refurb info (offset 0x%x)\n", FATX_REFURB_OFFSET);
+        retval = FATX_STATUS_ERROR;
+        goto cleanup;
+    }
+
+    if (fread(&refurb_info, sizeof(struct fatx_refurb_info), 1, device) != 1)
+    {
+        fprintf(stderr, "failed to read refurb info\n");
+        retval = FATX_STATUS_ERROR;
+        goto cleanup;
+    }
+
+    if (refurb_info.signature != FATX_REFURB_SIGNATURE)
+    {
+        fprintf(stderr, "invalid refurb signature\n");
+        retval = FATX_STATUS_ERROR;
+        goto cleanup;
+    }
+
+    retval = FATX_STATUS_SUCCESS;
+
+cleanup:
+    fclose(device);
+    return retval;
+}
+
+/*
+ * Write refurb sector.
+ */
+int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint64_t first_power_on)
+{
+    struct fatx_refurb_info refurb_info;
+    FILE * device;
+    int retval;
+
+    device = fopen(path, "r+b");
+    if (!device)
+    {
+        fprintf(stderr, "failed to open %s to write refurb info\n", path);
+        return FATX_STATUS_ERROR;
+    }
+
+    if (fseek(device, FATX_REFURB_OFFSET, SEEK_CUR))
+    {
+        fprintf(stderr, "failed to seek to the refurb info (offset 0x%x)\n", FATX_REFURB_OFFSET);
+        retval = FATX_STATUS_ERROR;
+        goto cleanup;
+    }
+
+    memset(&refurb_info, 0, sizeof(struct fatx_refurb_info));
+    refurb_info.signature = FATX_REFURB_SIGNATURE;
+    refurb_info.number_of_boots = number_of_boots;
+    refurb_info.first_power_on = first_power_on;
+
+    if (fwrite(&refurb_info, sizeof(struct fatx_refurb_info), 1, device) != 1)
+    {
+        fprintf(stderr, "failed to write refurb info\n");
+        retval = FATX_STATUS_ERROR;
+        goto cleanup;
+    }
+
+    retval = FATX_STATUS_SUCCESS;
+
+cleanup:
+    fclose(device);
     return retval;
 }
