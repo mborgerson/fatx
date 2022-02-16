@@ -70,15 +70,18 @@
 
 /* FAT entry types (not the actual value of the entry). */
 #define FATX_CLUSTER_AVAILABLE       0
-#define FATX_CLUSTER_MEDIA           1
-#define FATX_CLUSTER_DATA            2
+#define FATX_CLUSTER_DATA            1
+#define FATX_CLUSTER_RESERVED        2
 #define FATX_CLUSTER_BAD             3
-#define FATX_CLUSTER_END             4
-#define FATX_CLUSTER_INVALID         5
+#define FATX_CLUSTER_MEDIA           4
+#define FATX_CLUSTER_END             5
+#define FATX_CLUSTER_INVALID         6
 
 /* Helpful macros. */
 #define MIN(a,b) ( ( (a) <= (b) ) ? (a) : (b) )
 #define MAX(a,b) ( ( (a) >= (b) ) ? (a) : (b) )
+#define ARRAY_SIZE(array) \
+    (sizeof(array) / sizeof(array[0]))
 
 /*
  * The refurb info as it appears on disk.

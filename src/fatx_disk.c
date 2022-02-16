@@ -40,7 +40,7 @@ int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size)
 {
     struct fatx_partition_map_entry const *pi;
 
-    for (int i = 0; i < sizeof(fatx_partition_map); i++)
+    for (int i = 0; i < ARRAY_SIZE(fatx_partition_map); i++)
     {
         pi = &fatx_partition_map[i];
 
@@ -56,7 +56,7 @@ int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size)
 }
 
 /*
- * Return the disk size (in bytes).
+ * Determine the disk size (in bytes).
  */
 int fatx_disk_size(char const *path, size_t *size)
 {
@@ -86,7 +86,7 @@ cleanup:
 }
 
 /*
- * Return the remaining disk size (in bytes).
+ * Determine the remaining disk size (in bytes) from disk offset.
  */
 int fatx_disk_size_remaining(char const *path, size_t offset, size_t *remaining_size)
 {
@@ -115,9 +115,9 @@ int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, e
     struct fatx_partition_map_entry const *pi;
     size_t f_offset, f_size;
 
-    if (format_type == FATX_FORMAT_NONE)
+    if (format_type == FATX_FORMAT_INVALID)
     {
-        return FATX_STATUS_SUCCESS;
+        return FATX_STATUS_ERROR;
     }
 
     fatx_info(fs, "Writing refurb info...\n");
@@ -152,7 +152,6 @@ int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, e
     {
         return FATX_STATUS_SUCCESS;
     }
-
     else if (format_type == FATX_FORMAT_F_TAKES_ALL)
     {
         fatx_drive_to_offset_size('f', &f_offset, &f_size);
@@ -204,50 +203,6 @@ int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, size_t offs
 
 cleanup:
     fatx_close_device(fs);
-    return retval;
-}
-
-/*
- * Read refurb sector.
- */
-int fatx_disk_read_refurb_info(char const *path)
-{
-    struct fatx_refurb_info refurb_info;
-    FILE * device;
-    int retval;
-
-    device = fopen(path, "r");
-    if (!device)
-    {
-        fprintf(stderr, "failed to open %s to read refurb info\n", path);
-        return FATX_STATUS_ERROR;
-    }
-
-    if (fseek(device, FATX_REFURB_OFFSET, SEEK_END))
-    {
-        fprintf(stderr, "failed to seek to the refurb info (offset 0x%x)\n", FATX_REFURB_OFFSET);
-        retval = FATX_STATUS_ERROR;
-        goto cleanup;
-    }
-
-    if (fread(&refurb_info, sizeof(struct fatx_refurb_info), 1, device) != 1)
-    {
-        fprintf(stderr, "failed to read refurb info\n");
-        retval = FATX_STATUS_ERROR;
-        goto cleanup;
-    }
-
-    if (refurb_info.signature != FATX_REFURB_SIGNATURE)
-    {
-        fprintf(stderr, "invalid refurb signature\n");
-        retval = FATX_STATUS_ERROR;
-        goto cleanup;
-    }
-
-    retval = FATX_STATUS_SUCCESS;
-
-cleanup:
-    fclose(device);
     return retval;
 }
 

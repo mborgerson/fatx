@@ -44,10 +44,10 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
         return FATX_STATUS_ERROR;
     }
 
-    /* Compute partition size as remaining disk space */
+    /* Compute partition size using remaining disk space and align down to nearest sector */
     if (size == -1)
     {
-        if(fatx_disk_size_remaining(path, offset, &size))
+        if (fatx_disk_size_remaining(path, offset, &size))
         {
             fatx_error(fs, "failed to resolve partition size");
             return FATX_STATUS_ERROR;

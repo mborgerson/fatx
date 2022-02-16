@@ -61,16 +61,15 @@ int fatx_init_fat(struct fatx_fs *fs)
     while (bytes_remaining > 0)
     {
         size_t bytes_to_write = MIN(chunk_size, bytes_remaining);
-        if(fatx_dev_write(fs, chunk, bytes_to_write, 1) != 1)
+        if (fatx_dev_write(fs, chunk, bytes_to_write, 1) != 1)
         {
             fatx_error(fs, "failed to clear FAT chunk (offset 0x%zx)\n", fs->fat_offset + (bytes_remaining - fs->fat_size));
             retval = FATX_STATUS_ERROR;
-            goto cleanup;
+            break;
         }
         bytes_remaining -= bytes_to_write;
     }
 
-cleanup:
     free(chunk);
     return retval;
 }
@@ -199,6 +198,8 @@ int fatx_get_fat_entry_type(struct fatx_fs *fs, fatx_fat_entry entry)
     {
         case 0x00000000:
             return FATX_CLUSTER_AVAILABLE;
+        case 0xfffffff0:
+            return FATX_CLUSTER_RESERVED;
         case 0xfffffff7:
             return FATX_CLUSTER_BAD;
         case 0xfffffff8:
@@ -207,7 +208,7 @@ int fatx_get_fat_entry_type(struct fatx_fs *fs, fatx_fat_entry entry)
             return FATX_CLUSTER_END;
     }
 
-    if (entry <= 0xfffffff0)
+    if (entry < 0xfffffff0)
     {
         return FATX_CLUSTER_DATA;
     }

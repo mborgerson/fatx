@@ -46,6 +46,18 @@
 #define FATX_RETAIL_CLUSTER_SIZE     (16 * 1024)
 #define FATX_RETAIL_PARTITION_COUNT  5
 
+/*
+ * This define should always be passed to fatx_open_device(...) as the
+ * sectors_per_cluster argument when opening existing FATX filesystems.
+ *
+ * It is a special value designed to tell fatx_open_device(...) that it
+ * must read the superblock of the FATX partition being opened to determine
+ * how many sectors_per_cluster the partition was formatted with.
+ *
+ * The cases where this define is NOT passed to fatx_open_device(...) is
+ * when formatting a new disk. In this case, the caller is expected to pass
+ * pass a valid non-zero sectors_per_cluster to format the partition with.
+ */
 #define FATX_READ_FROM_SUPERBLOCK    0
 
 struct fatx_fs {
@@ -107,7 +119,7 @@ struct fatx_partition_map_entry {
 };
 
 enum fatx_format {
-    FATX_FORMAT_NONE,
+    FATX_FORMAT_INVALID,
     FATX_FORMAT_RETAIL,
     FATX_FORMAT_F_TAKES_ALL
 };
@@ -142,7 +154,6 @@ int fatx_disk_size_remaining(char const *path, size_t offset, size_t *size);
 int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, enum fatx_format format_type, size_t sectors_per_cluster);
 int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size, size_t sectors_per_cluster);
 int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size);
-int fatx_disk_read_refurb_info(char const *path);
 int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint64_t first_power_on);
 
 #endif

@@ -625,7 +625,6 @@ void fatx_fuse_print_usage(void)
                     "    --loglevel=<level>             control the log output level (a higher value yields more output)\n\n"
                     "Disk formatting options:\n"
                     "    --format=<format>              specify the format (retail, f-takes-all) to initialize the device to\n"
-                    "    --sector-size=<size>           specify the size (in bytes) of a device sector (default is 512)\n"
                     "    --sectors-per-cluster=<size>   specify the sectors per cluster when initializing non-retail partitions (default is 128)\n"
                     "    --destroy-all-existing-data    acknowledge that device formatting will destroy all existing data\n\n");
 
