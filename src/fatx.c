@@ -88,7 +88,10 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
         case 16:
         case 32:
         case 64:
-        case 128:
+        case 128: // retail max
+        case 256:
+        case 512:
+        case 1024:
             break;
 
         default:
@@ -138,7 +141,7 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     fatx_info(fs, "  Partition Size:      0x%zx bytes\n", fs->partition_size);
     fatx_info(fs, "  Volume Id:           %.8x\n",        fs->volume_id);
     fatx_info(fs, "  Bytes per Sector:    %d\n",          fs->sector_size);
-    fatx_info(fs, "  # of Sectors:        %d\n",          fs->num_sectors);
+    fatx_info(fs, "  # of Sectors:        %llu\n",        fs->num_sectors);
     fatx_info(fs, "  Sectors per Cluster: %d\n",          fs->sectors_per_cluster);
     fatx_info(fs, "  # of Clusters:       %d\n",          fs->num_clusters);
     fatx_info(fs, "  Bytes per Cluster:   %d\n",          fs->bytes_per_cluster);
