@@ -26,6 +26,7 @@ set(FATX_SOURCES "")
 set(FATXFS_SOURCES "")
 add_subdirectory(${CMAKE_SOURCE_DIR}/src)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_definitions("-ansi -Wall --std=c99 -pedantic")
 add_library(fatx ${FATX_SOURCES})
 
