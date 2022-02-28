@@ -26,10 +26,11 @@ set(FATX_SOURCES "")
 set(FATXFS_SOURCES "")
 add_subdirectory(${CMAKE_SOURCE_DIR}/src)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_definitions("-ansi -Wall --std=c99 -pedantic")
 add_library(fatx ${FATX_SOURCES})
 
-if(FUSE_MODULE_NAME)
+if(FUSE_FOUND)
     add_executable(fatxfs ${FATXFS_SOURCES})
     target_link_libraries(fatxfs fatx ${FUSE_LDFLAGS})
     target_include_directories(fatxfs PUBLIC ${FUSE_INCLUDE_DIRS})

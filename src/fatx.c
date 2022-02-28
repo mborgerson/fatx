@@ -27,7 +27,7 @@
 /*
  * Open a device.
  */
-int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size)
+int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size, size_t sectors_per_cluster)
 {
     int retval = 0;
     size_t cluster_limit = 0;
@@ -35,20 +35,30 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     if (sector_size != 512 && sector_size != 4096)
     {
         fatx_error(fs, "expected sector size to be 512 or 4096, got %d\n", sector_size);
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
-    /* Sanity check partition offset and size. */
     if (offset % sector_size)
     {
-        fatx_error(fs, "specified partition offset does not reside on sector boundary (%d bytes)\n", sector_size);
-        return -1;
+        fatx_error(fs, "specified partition offset (0x%zx) does not reside on sector boundary (%d bytes)\n", offset, sector_size);
+        return FATX_STATUS_ERROR;
+    }
+
+    /* Compute partition size using remaining disk space and align down to nearest sector */
+    if (size == -1)
+    {
+        if (fatx_disk_size_remaining(path, offset, &size))
+        {
+            fatx_error(fs, "failed to resolve partition size");
+            return FATX_STATUS_ERROR;
+        }
+        size &= ~(sector_size - 1);
     }
 
     if (size % sector_size)
     {
         fatx_error(fs, "specified partition size does not reside on sector boundary (%d bytes)\n", sector_size);
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
     fs->device_path      = path;
@@ -60,38 +70,52 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     if (!fs->device)
     {
         fatx_error(fs, "failed to open %s for reading and writing\n", path);
-        return -1;
+        return FATX_STATUS_ERROR;
     }
 
-    /* Check signature. */
-    if (fatx_check_partition_signature(fs))
+    if (fatx_init_superblock(fs, sectors_per_cluster))
     {
-        retval = -1;
-        goto cleanup;
+        return FATX_STATUS_ERROR;
     }
 
-    /* Process superblock. */
-    if (fatx_process_superblock(fs))
+    /* Validate that an acceptable cluster+sector combo was configured */
+    switch (fs->sectors_per_cluster)
     {
-        retval = -1;
-        goto cleanup;
+        case 1:
+        case 2:
+        case 4:
+        case 8:
+        case 16:
+        case 32:
+        case 64:
+        case 128: // retail max
+        case 256:
+        case 512:
+        case 1024:
+            break;
+
+        default:
+            fatx_error(fs, "invalid sectors per cluster %d\n", fs->sectors_per_cluster);
+            retval = FATX_STATUS_ERROR;
+            goto cleanup;
     }
 
     fs->num_sectors       = fs->partition_size / fs->sector_size;
     fs->num_clusters      = fs->num_sectors / fs->sectors_per_cluster;
     fs->bytes_per_cluster = fs->sectors_per_cluster * fs->sector_size;
-    fs->fat_offset        = fs->partition_offset+FATX_FAT_OFFSET;
+    fs->fat_offset        = fs->partition_offset + FATX_FAT_OFFSET;
 
     cluster_limit = fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT;
 
     if (fs->root_cluster >= cluster_limit)
     {
         fatx_error(fs, "root cluster %d exceeds cluster limit\n", fs->root_cluster);
-        retval = -1;
+        retval = FATX_STATUS_ERROR;
         goto cleanup;
     }
 
-    if (fs->num_clusters < 65525)
+    /* NOTE: this *MUST* be kept below the Cluster Reserved marker for FAT16 */
+    if (fs->num_clusters < 0xfff0)
     {
         fs->fat_type = FATX_FAT_TYPE_16;
         fs->fat_size = cluster_limit*2;
@@ -117,9 +141,10 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t
     fatx_info(fs, "  Partition Size:      0x%zx bytes\n", fs->partition_size);
     fatx_info(fs, "  Volume Id:           %.8x\n",        fs->volume_id);
     fatx_info(fs, "  Bytes per Sector:    %d\n",          fs->sector_size);
-    fatx_info(fs, "  # of Sectors:        %d\n",          fs->num_sectors);
+    fatx_info(fs, "  # of Sectors:        %llu\n",        fs->num_sectors);
     fatx_info(fs, "  Sectors per Cluster: %d\n",          fs->sectors_per_cluster);
     fatx_info(fs, "  # of Clusters:       %d\n",          fs->num_clusters);
+    fatx_info(fs, "  Bytes per Cluster:   %d\n",          fs->bytes_per_cluster);
     fatx_info(fs, "  FAT Offset:          0x%zx bytes\n", fs->fat_offset);
     fatx_info(fs, "  FAT Size:            0x%zx bytes\n", fs->fat_size);
     fatx_info(fs, "  FAT Type:            %s\n",          fs->fat_type == FATX_FAT_TYPE_16 ? "16" : "32");

@@ -40,38 +40,26 @@ enum {
     FATX_FUSE_OPT_KEY_OFFSET,
     FATX_FUSE_OPT_KEY_SIZE,
     FATX_FUSE_OPT_KEY_SECTOR_SIZE,
+    FATX_FUSE_OPT_KEY_SECTORS_PER_CLUSTER,
+    FATX_FUSE_OPT_KEY_FORMAT,
+    FATX_FUSE_OPT_KEY_DESTROY_DATA,
     FATX_FUSE_OPT_KEY_LOG,
     FATX_FUSE_OPT_KEY_LOGLEVEL,
 };
 
-/*
- * Xbox Harddisk Partition Map
- */
-struct fatx_fuse_partition_map_entry {
-    char   letter;
-    size_t offset;
-    size_t size;
-};
-
-struct fatx_fuse_partition_map_entry const fatx_fuse_partition_map[] = {
-    { .letter = 'x',    .offset = 0x00080000, .size = 0x02ee00000 },
-    { .letter = 'y',    .offset = 0x2ee80000, .size = 0x02ee00000 },
-    { .letter = 'z',    .offset = 0x5dc80000, .size = 0x02ee00000 },
-    { .letter = 'c',    .offset = 0x8ca80000, .size = 0x01f400000 },
-    { .letter = 'e',    .offset = 0xabe80000, .size = 0x131f00000 },
-    { .letter = '\x00', .offset = 0x00000000, .size = 0x000000000 },
-};
-
 struct fatx_fuse_private_data {
-    struct fatx_fs *fs;
-    char const     *device_path;
-    char const     *log_path;
-    char            mount_partition_drive;
-    size_t          mount_partition_offset;
-    size_t          mount_partition_size;
-    size_t          device_sector_size;
-    FILE           *log_handle;
-    int             log_level;
+    struct fatx_fs   *fs;
+    char const       *device_path;
+    char const       *log_path;
+    char              mount_partition_drive;
+    size_t            mount_partition_offset;
+    size_t            mount_partition_size;
+    size_t            device_sector_size;
+    size_t            device_sectors_per_cluster;
+    FILE             *log_handle;
+    int               log_level;
+    enum fatx_format  format;
+    int               format_confirm;
 };
 
 /*
@@ -102,7 +90,6 @@ int fatx_fuse_opt_proc(void *data, const char *arg, int key, struct fuse_args *o
  * Helper functions.
  */
 struct fatx_fuse_private_data *fatx_fuse_get_private_data(void);
-int fatx_fuse_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size);
 void fatx_fuse_print_usage(void);
 void fatx_fuse_print_version(void);
 
@@ -133,26 +120,6 @@ struct fatx_fuse_private_data *fatx_fuse_get_private_data(void)
     context = fuse_get_context();
     if (context == NULL) return NULL;
     return (struct fatx_fuse_private_data *)(context->private_data);
-}
-
-/*
- * Given a drive letter, determine partition offset and size (in bytes).
- */
-int fatx_fuse_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size)
-{
-    struct fatx_fuse_partition_map_entry const *pi;
-
-    for (pi = &fatx_fuse_partition_map[0]; pi->letter != '\x00'; pi++)
-    {
-        if (pi->letter == drive_letter)
-        {
-            *offset = pi->offset;
-            *size   = pi->size;
-            return 0;
-        }
-    }
-
-    return -1;
 }
 
 /*
@@ -578,6 +545,32 @@ int fatx_fuse_opt_proc(void *data, const char *arg, int key, struct fuse_args *o
         pd->device_sector_size = strtol(arg, NULL, 0);
         return 0;
 
+    case FATX_FUSE_OPT_KEY_SECTORS_PER_CLUSTER:
+        arg = fatx_fuse_opt_consume_key(arg);
+        pd->device_sectors_per_cluster = strtol(arg, NULL, 0);
+        return 0;
+
+    case FATX_FUSE_OPT_KEY_FORMAT:
+        arg = fatx_fuse_opt_consume_key(arg);
+        if (!strcmp(arg, "retail"))
+        {
+            pd->format = FATX_FORMAT_RETAIL;
+        }
+        else if (!strcmp(arg, "f-takes-all"))
+        {
+            pd->format = FATX_FORMAT_F_TAKES_ALL;
+        }
+        else
+        {
+            fprintf(stderr, "invalid format '%s' specified\n", arg);
+            return -1;
+        }
+        return 0;
+
+    case FATX_FUSE_OPT_KEY_DESTROY_DATA:
+        pd->format_confirm = 1;
+        return 0;
+
     case FATX_FUSE_OPT_KEY_LOG:
         pd->log_path = fatx_fuse_opt_consume_key(arg);
         return 0;
@@ -617,19 +610,23 @@ void fatx_fuse_print_usage(void)
     /* Print basic usage */
     fprintf(stderr, "FATXFS - Userspace FATX Filesystem Driver\n\n");
     fprintf(stderr, "Usage: %s <device> <mountpoint> [<options>]\n", prog_short_name);
-    fprintf(stderr, "   or: %s <device> <mountpoint> --drive=c|e|x|y|z [<options>]\n", prog_short_name);
+    fprintf(stderr, "   or: %s <device> <mountpoint> --drive=c|e|x|y|z|f [<options>]\n", prog_short_name);
     fprintf(stderr, "   or: %s <device> <mountpoint> --offset=<offset> --size=<size> [<options>]\n\n", prog_short_name);
-    fprintf(stderr, "General Options:\n"
-                    "    -o opt, [opt...]       mount options\n"
-                    "    -h --help              print help\n"
-                    "    -V --version           print version\n\n"
+    fprintf(stderr, "General options:\n"
+                    "    -o opt, [opt...]               mount options\n"
+                    "    -h --help                      print help\n"
+                    "    -V --version                   print version\n\n"
                     "FATXFS options:\n"
-                    "    --drive=<letter>       mount a partition by its drive letter\n"
-                    "    --offset=<offset>      specify the offset (in bytes) of a partition manually\n"
-                    "    --size=<size>          specify the size (in bytes) of a partition manually\n"
-                    "    --sector-size=<size>   specify the size (in bytes) of a device sector (default is 512)\n"
-                    "    --log=<log path>       enable fatxfs logging\n"
-                    "    --loglevel=<level>     control the log output level (a higher value yields more output)\n\n");
+                    "    --drive=<letter>               mount a partition by its drive letter\n"
+                    "    --offset=<offset>              specify the offset (in bytes) of a partition manually\n"
+                    "    --size=<size>                  specify the size (in bytes) of a partition manually\n"
+                    "    --sector-size=<size>           specify the size (in bytes) of a device sector (default is 512)\n"
+                    "    --log=<log path>               enable fatxfs logging\n"
+                    "    --loglevel=<level>             control the log output level (a higher value yields more output)\n\n"
+                    "Disk formatting options:\n"
+                    "    --format=<format>              specify the format (retail, f-takes-all) to initialize the device to\n"
+                    "    --sectors-per-cluster=<size>   specify the sectors per cluster when initializing non-retail partitions (default is 128)\n"
+                    "    --destroy-all-existing-data    acknowledge that device formatting will destroy all existing data\n\n");
 
     /* Print FUSE options */
     argv[0] = prog_short_name;
@@ -650,25 +647,29 @@ int main(int argc, char *argv[])
 
     /* Define command line options. */
     struct fuse_opt const opts [] = {
-        FUSE_OPT_KEY("-h",             FATX_FUSE_OPT_KEY_HELP),
-        FUSE_OPT_KEY("--help",         FATX_FUSE_OPT_KEY_HELP),
-        FUSE_OPT_KEY("-V",             FATX_FUSE_OPT_KEY_VERSION),
-        FUSE_OPT_KEY("--version",      FATX_FUSE_OPT_KEY_VERSION),
-        FUSE_OPT_KEY("--drive=",       FATX_FUSE_OPT_KEY_DRIVE),
-        FUSE_OPT_KEY("--offset=",      FATX_FUSE_OPT_KEY_OFFSET),
-        FUSE_OPT_KEY("--size=",        FATX_FUSE_OPT_KEY_SIZE),
-        FUSE_OPT_KEY("--sector-size=", FATX_FUSE_OPT_KEY_SECTOR_SIZE),
-        FUSE_OPT_KEY("--log=",         FATX_FUSE_OPT_KEY_LOG),
-        FUSE_OPT_KEY("--loglevel=",    FATX_FUSE_OPT_KEY_LOGLEVEL),
+        FUSE_OPT_KEY("-h",                           FATX_FUSE_OPT_KEY_HELP),
+        FUSE_OPT_KEY("--help",                       FATX_FUSE_OPT_KEY_HELP),
+        FUSE_OPT_KEY("-V",                           FATX_FUSE_OPT_KEY_VERSION),
+        FUSE_OPT_KEY("--version",                    FATX_FUSE_OPT_KEY_VERSION),
+        FUSE_OPT_KEY("--drive=",                     FATX_FUSE_OPT_KEY_DRIVE),
+        FUSE_OPT_KEY("--offset=",                    FATX_FUSE_OPT_KEY_OFFSET),
+        FUSE_OPT_KEY("--size=",                      FATX_FUSE_OPT_KEY_SIZE),
+        FUSE_OPT_KEY("--sector-size=",               FATX_FUSE_OPT_KEY_SECTOR_SIZE),
+        FUSE_OPT_KEY("--format=" ,                   FATX_FUSE_OPT_KEY_FORMAT),
+        FUSE_OPT_KEY("--sectors-per-cluster=" ,      FATX_FUSE_OPT_KEY_SECTORS_PER_CLUSTER),
+        FUSE_OPT_KEY("--destroy-all-existing-data",  FATX_FUSE_OPT_KEY_DESTROY_DATA),
+        FUSE_OPT_KEY("--log=",                       FATX_FUSE_OPT_KEY_LOG),
+        FUSE_OPT_KEY("--loglevel=",                  FATX_FUSE_OPT_KEY_LOGLEVEL),
         FUSE_OPT_END,
     };
 
     /* Initialize private data. */
     memset(&pd, 0, sizeof(struct fatx_fuse_private_data));
-    pd.mount_partition_size   = -1;
-    pd.mount_partition_offset = -1;
-    pd.device_sector_size     = 512;
-    pd.log_level              = FATX_LOG_LEVEL_INFO;
+    pd.mount_partition_size       = -1;
+    pd.mount_partition_offset     = -1;
+    pd.device_sector_size         = 512;
+    pd.device_sectors_per_cluster = 128;
+    pd.log_level                  = FATX_LOG_LEVEL_INFO;
 
     /* Parse command line arguments. */
     if (fuse_opt_parse(&args, &pd, opts, &fatx_fuse_opt_proc) != 0)
@@ -713,9 +714,9 @@ int main(int argc, char *argv[])
             pd.mount_partition_drive = 'c';
         }
 
-        status = fatx_fuse_drive_to_offset_size(pd.mount_partition_drive,
-                                                &pd.mount_partition_offset,
-                                                &pd.mount_partition_size);
+        status = fatx_drive_to_offset_size(pd.mount_partition_drive,
+                                           &pd.mount_partition_offset,
+                                           &pd.mount_partition_size);
         if (status)
         {
             fprintf(stderr, "unknown drive letter '%c'\n", pd.mount_partition_drive);
@@ -746,12 +747,32 @@ int main(int argc, char *argv[])
         fatx_log_init(pd.fs, pd.log_handle, pd.log_level);
     }
 
+    /* Reformat the drive (if desired) */
+    if (pd.format)
+    {
+        if (pd.format_confirm)
+        {
+            return fatx_disk_format(pd.fs, pd.device_path, pd.device_sector_size, pd.format, pd.device_sectors_per_cluster);
+        }
+        else
+        {
+            fprintf(stderr, "please specify --destroy-all-existing-data to perform device formatting\n");
+            return -1;
+        }
+    }
+    else if (pd.format_confirm)
+    {
+        fprintf(stderr, "--destroy-all-existing-data can only be used with --format\n");
+        return -1;
+    }
+
     /* Open the device */
     status = fatx_open_device(pd.fs,
                               pd.device_path,
                               pd.mount_partition_offset,
                               pd.mount_partition_size,
-                              pd.device_sector_size);
+                              pd.device_sector_size,
+                              FATX_READ_FROM_SUPERBLOCK);
     if (status)
     {
         fprintf(stderr, "failed to initialize the filesystem\n");

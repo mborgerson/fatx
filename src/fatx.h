@@ -23,6 +23,7 @@
 #define _XOPEN_SOURCE 500
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -42,6 +43,23 @@
 #define FATX_STATUS_FILE_DELETED     1
 #define FATX_STATUS_END_OF_DIR       2
 
+#define FATX_RETAIL_CLUSTER_SIZE     (16 * 1024)
+#define FATX_RETAIL_PARTITION_COUNT  5
+
+/*
+ * This define should always be passed to fatx_open_device(...) as the
+ * sectors_per_cluster argument when opening existing FATX filesystems.
+ *
+ * It is a special value designed to tell fatx_open_device(...) that it
+ * must read the superblock of the FATX partition being opened to determine
+ * how many sectors_per_cluster the partition was formatted with.
+ *
+ * The cases where this define is NOT passed to fatx_open_device(...) is
+ * when formatting a new disk. In this case, the caller is expected to pass
+ * pass a valid non-zero sectors_per_cluster to format the partition with.
+ */
+#define FATX_READ_FROM_SUPERBLOCK    0
+
 struct fatx_fs {
     char const *device_path;
     FILE       *device;
@@ -49,7 +67,7 @@ struct fatx_fs {
     size_t      partition_offset;
     size_t      partition_size;
     uint32_t    volume_id;
-    uint32_t    num_sectors;
+    uint64_t    num_sectors;
     uint32_t    num_clusters;
     uint32_t    sectors_per_cluster;
     uint8_t     fat_type;
@@ -90,7 +108,24 @@ struct fatx_attr {
     struct fatx_ts accessed;
 };
 
-int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size);
+/*
+ * Xbox Harddisk Partition Map
+ */
+
+struct fatx_partition_map_entry {
+    char   letter;
+    size_t offset;
+    size_t size;
+};
+
+enum fatx_format {
+    FATX_FORMAT_INVALID,
+    FATX_FORMAT_RETAIL,
+    FATX_FORMAT_F_TAKES_ALL
+};
+
+/* FATX Functions */
+int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size, size_t sectors_per_cluster);
 int fatx_close_device(struct fatx_fs *fs);
 int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir);
 int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *entry, struct fatx_attr *attr, struct fatx_dirent **result);
@@ -112,5 +147,13 @@ int fatx_truncate(struct fatx_fs *fs, char const *path, off_t offset);
 int fatx_rename(struct fatx_fs *fs, char const *from, char const *to);
 void fatx_time_t_to_fatx_ts(const time_t in, struct fatx_ts *out);
 time_t fatx_ts_to_time_t(struct fatx_ts *in);
+
+/* Disk Functions */
+int fatx_disk_size(char const *path, size_t *size);
+int fatx_disk_size_remaining(char const *path, size_t offset, size_t *size);
+int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, enum fatx_format format_type, size_t sectors_per_cluster);
+int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size, size_t sectors_per_cluster);
+int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size);
+int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint64_t first_power_on);
 
 #endif

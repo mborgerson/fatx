@@ -60,12 +60,12 @@ class Fatx:
 				'y': (0x2ee80000, 0x02ee00000),
 				'z': (0x5dc80000, 0x02ee00000),
 				'c': (0x8ca80000, 0x01f400000),
-				'e': (0xabe80000, 0x131f00000),
+				'e': (0xabe80000, 0x1312d6000),
 			}
 			offset, size = partitions[drive]
 		if isinstance(path, str):
 			path = path.encode('utf-8')
-		s = fatx_open_device(self.fs, path, offset, size, sector_size)
+		s = fatx_open_device(self.fs, path, offset, size, sector_size, 0)
 		if s != 0:
 			self.fs = None
 		assert s == 0

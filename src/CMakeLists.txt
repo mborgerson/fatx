@@ -21,6 +21,7 @@ set(FATX_SOURCES ${FATX_SOURCES}
                  ${CMAKE_CURRENT_SOURCE_DIR}/fatx_attr.c
                  ${CMAKE_CURRENT_SOURCE_DIR}/fatx_dev.c
                  ${CMAKE_CURRENT_SOURCE_DIR}/fatx_dir.c
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fatx_disk.c
                  ${CMAKE_CURRENT_SOURCE_DIR}/fatx_fat.c
                  ${CMAKE_CURRENT_SOURCE_DIR}/fatx_file.c
                  ${CMAKE_CURRENT_SOURCE_DIR}/fatx_internal.h
