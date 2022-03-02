@@ -16,9 +16,11 @@ DST_PATH="c/a/b/c/d/randfile.bin"
 
 mkdir -p $(dirname $DST_PATH)
 cp $SRC_PATH $DST_PATH
+sleep 1
 fusermount -u c
 
 # Mount and verify contents
 fatxfs xbox_hdd.img c
 [[ $(checksum $DST_PATH) = $(checksum $SRC_PATH) ]]
+sleep 1
 fusermount -u c
