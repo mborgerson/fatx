@@ -20,6 +20,7 @@
 #include "fatx_internal.h"
 #include <stdbool.h>
 #include <time.h>
+#include <stdlib.h>
 
 /*
  * Determine the cluster which contains a byte offset of a file.
@@ -314,7 +315,7 @@ int fatx_mknod(struct fatx_fs *fs, char const *path)
 {
     struct fatx_attr attr;
     struct fatx_dir dir;
-    char path_buf[strlen(path)+1];
+    char *path_dirname;
     int status;
 
     fatx_debug(fs, "fatx_mknod(path=\"%s\")\n", path);
@@ -328,8 +329,9 @@ int fatx_mknod(struct fatx_fs *fs, char const *path)
     }
 
     /* Open the directory. */
-    strcpy(path_buf, path);
-    status = fatx_open_dir(fs, fatx_dirname(path_buf), &dir);
+    path_dirname = fatx_dirname(path);
+    status = fatx_open_dir(fs, path_dirname, &dir);
+    free(path_dirname);
     if (status) return status;
 
     /* Create the file node */
@@ -409,13 +411,17 @@ int fatx_rename(struct fatx_fs *fs, char const *from, char const *to)
     fatx_debug(fs, "fatx_rename(from=\"%s\", to=\"%s\")\n", from, to);
 
     struct fatx_attr attr;
-    char from_path[strlen(from)+1], to_path[strlen(to)+1], *to_base;
-    int status;
+    char *from_dirname, *to_dirname;
+    char *to_basename;
+    int path_dif, status;
 
     /* Sanity check that we're not trying to move the file */
-    strcpy(from_path, from);
-    strcpy(to_path, to);
-    if (strcmp(fatx_dirname(from_path), fatx_dirname(to_path)) != 0)
+    from_dirname = fatx_dirname(from);
+    to_dirname = fatx_dirname(to);
+    path_dif = strcmp(from_dirname, to_dirname);
+    free(from_dirname);
+    free(to_dirname);
+    if (path_dif)
     {
         fatx_error(fs, "rename directories do not match\n");
         return FATX_STATUS_ERROR;
@@ -426,16 +432,17 @@ int fatx_rename(struct fatx_fs *fs, char const *from, char const *to)
     if (status) return status;
 
     /* Check that the new filename is not too long */
-    strcpy(to_path, to);
-    to_base = fatx_basename(to_path);
-    if (strlen(to_base) >= FATX_MAX_FILENAME_LEN)
+    to_basename = fatx_basename(to);
+    if (strlen(to_basename) >= FATX_MAX_FILENAME_LEN)
     {
+        free(to_basename);
         fatx_error(fs, "destination name too long\n");
         return FATX_STATUS_ERROR;
     }
 
     /* Rename the file */
-    strcpy(attr.filename, to_base);
+    strcpy(attr.filename, to_basename);
+    free(to_basename);
 
     /* Save new attributes */
     return fatx_set_attr(fs, from, &attr);

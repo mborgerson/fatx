@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define _XOPEN_SOURCE 600
+
 #include "fatx.h"
 #include "fatx_version.h"
 

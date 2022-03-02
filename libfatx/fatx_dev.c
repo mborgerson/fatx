@@ -20,13 +20,17 @@
 #include "fatx_internal.h"
 
 /*
- * Seek to a cluster, byte offset in the device.
+ * Seek to a byte offset in the device.
  */
-int fatx_dev_seek(struct fatx_fs *fs, off_t offset)
+int fatx_dev_seek(struct fatx_fs *fs, uint64_t offset)
 {
     int status;
 
-    status = fseek(fs->device, offset, SEEK_SET);
+#ifdef _WIN32
+    status = _fseeki64(fs->device, offset, SEEK_SET);
+#else
+    status = fseeko(fs->device, offset, SEEK_SET);
+#endif
     if (status)
     {
         fatx_error(fs, "failed to seek\n");
@@ -37,12 +41,12 @@ int fatx_dev_seek(struct fatx_fs *fs, off_t offset)
 }
 
 /*
- * Seek to a cluster, byte offset in the device.
+ * Seek to a cluster + byte offset in the device.
  */
 int fatx_dev_seek_cluster(struct fatx_fs *fs, size_t cluster, off_t offset)
 {
     int status;
-    size_t pos;
+    uint64_t pos;
 
     fatx_debug(fs, "fatx_dev_seek_cluster(cluster=%zd, offset=0x%zx)\n", cluster, offset);
 
@@ -51,14 +55,7 @@ int fatx_dev_seek_cluster(struct fatx_fs *fs, size_t cluster, off_t offset)
 
     pos += offset;
 
-    status = fseek(fs->device, pos, SEEK_SET);
-    if (status)
-    {
-        fatx_error(fs, "failed to seek\n");
-        return FATX_STATUS_ERROR;
-    }
-
-    return FATX_STATUS_SUCCESS;
+    return fatx_dev_seek(fs, pos);
 }
 
 /*

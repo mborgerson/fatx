@@ -219,7 +219,7 @@ int fatx_get_fat_entry_type(struct fatx_fs *fs, fatx_fat_entry entry)
 /*
  * Get the absolute byte address of the start of the cluster.
  */
-int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, size_t *offset)
+int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, uint64_t *offset)
 {
     fatx_debug(fs, "fatx_cluster_number_to_byte_offset - cluster = %zd\n", cluster);
 
