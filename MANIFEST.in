@@ -1,0 +1,4 @@
+include CMakeLists.txt
+graft pyfatx
+graft libfatx
+include build_cffi.py
