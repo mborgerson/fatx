@@ -8,7 +8,7 @@ fatx
   libfatx that enables you to mount a FATX filesystem on your host system and
   interact with it using your typical system tools.
 * **pyfatx** is a Python module providing bindings to libfatx.
-* **gfatx** is a graphical utility for working with FATX disk images, built around libfatx. Note: can only browse filesystem at the moment.
+* **gfatx** is a graphical utility for working with FATX disk images, built around libfatx.
 
 Status
 ------
@@ -102,9 +102,11 @@ option.
 
 pyfatx
 ------
+[![pypi](https://img.shields.io/pypi/v/pyfatx)](https://pypi.org/project/pyfatx/)
+
 The pyfatx library can be installed via:
 
-    $ pip install git+https://github.com/mborgerson/fatx
+    $ pip install pyfatx
 
 A FATX filesystem can be extracted with:
 
@@ -113,16 +115,39 @@ A FATX filesystem can be extracted with:
 gfatx
 -----
 
+![gfatx](screenshots/gfatx.png)
+
+Note: In a very early state. Can only browse filesystem at the moment.
+
+### Build on Ubuntu
+```
+sudo apt install qt5-default
+mkdir build && cd build && cmake .. && make gfatx
+```
 
 ### Build on Windows
 * Install Visual Studio 2019
 * Install Qt (5.15.2)
 * From Start menu, launch a Qt 5.15.2 + MSVC 2019 command prompt
-* Run `"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat" amd64`
-* `mkdir build`
-* `cd build`
-* `cmake --build build --target gfatx`
 
+```
+"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat" amd64
+mkdir build
+cd build
+cmake --build build --target gfatx
+```
+
+### Build on macOS
+```
+brew install pkgconfig qt@5
+export PATH="/usr/local/opt/qt@5/bin:$PATH"
+export LDFLAGS="-L/usr/local/opt/qt@5/lib"
+export CPPFLAGS="-I/usr/local/opt/qt@5/include"
+export PKG_CONFIG_PATH="/usr/local/opt/qt@5/lib/pkgconfig"
+mkdir build
+cd build
+cmake ..
+```
 
 License
 -------
