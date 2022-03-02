@@ -17,7 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef _WIN32
 #include <sys/time.h>
+#endif
+
 #include "fatx_internal.h"
 
 /*
@@ -53,7 +56,9 @@ int fatx_check_partition_signature(struct fatx_fs *fs)
  */
 int fatx_init_superblock(struct fatx_fs *fs, size_t sectors_per_cluster)
 {
+#ifndef _WIN32
     struct timeval time;
+#endif
 
     /* Initialize device with existing FATX superblock. */
     if (sectors_per_cluster == FATX_READ_FROM_SUPERBLOCK)
@@ -67,8 +72,12 @@ int fatx_init_superblock(struct fatx_fs *fs, size_t sectors_per_cluster)
     /* Initialize device with a new FATX superblock. */
     else
     {
+#ifdef _WIN32
+        fs->volume_id = 12345678;
+#else
         gettimeofday(&time, NULL);
         fs->volume_id = time.tv_usec;
+#endif
         fs->root_cluster = 1;
         fs->sectors_per_cluster = sectors_per_cluster;
     }
