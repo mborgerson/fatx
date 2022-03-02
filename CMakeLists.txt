@@ -28,3 +28,4 @@ target_compile_options(fatx PUBLIC -D_FILE_OFFSET_BITS=64)
 set_target_properties(fatx PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/fatxfs)
+add_subdirectory(${CMAKE_SOURCE_DIR}/gfatx)
