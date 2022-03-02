@@ -30,5 +30,10 @@ if (MSVC)
 endif()
 set_target_properties(fatx PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+if (EXISTS ${CMAKE_SOURCE_DIR}/fatxfs)
 add_subdirectory(${CMAKE_SOURCE_DIR}/fatxfs)
+endif()
+
+if (EXISTS ${CMAKE_SOURCE_DIR}/gfatx)
 add_subdirectory(${CMAKE_SOURCE_DIR}/gfatx)
+endif()
