@@ -3,7 +3,7 @@ from setuptools import setup
 from build_cffi import FfiPreBuildExtension
 
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 
 setup(name='pyfatx',
