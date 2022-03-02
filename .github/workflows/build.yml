@@ -13,19 +13,39 @@ on:
       - 'README.md'
 
 jobs:
+  BuildWindows:
+    name: Build on Windows
+    runs-on: windows-latest
+    steps:
+    - name: Clone
+      uses: actions/checkout@v2
+    - name: Cache Qt
+      id: cache-qt
+      uses: actions/cache@v1  # not v2!
+      with:
+        path: ../Qt
+        key: ${{ runner.os }}-QtCache
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v2
+      with:
+        cached: ${{ steps.cache-qt.outputs.cache-hit }}
+        setup-python: false
+    - name: Build
+      run: |
+        mkdir build
+        cmake -B build
+        cmake --build build --parallel --verbose --target gfatx
   BuildUbuntu:
     name: Build on Ubuntu
     runs-on: ubuntu-latest
     steps:
       - name: Clone
         uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy \
-            build-essential pkg-config libfuse-dev cmake git
+            build-essential pkg-config libfuse-dev cmake git qt5-default
       - name: Build
         run: |
           mkdir build
@@ -48,8 +68,6 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
       - name: Build
         run: docker build -t fatx .
       - name: Test
@@ -62,15 +80,18 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
       - name: Install dependencies
         run: |
           export HOMEBREW_NO_AUTO_UPDATE=1
           export HOMEBREW_NO_INSTALL_CLEANUP=1
-          brew install pkgconfig cmake macfuse
+          brew install pkgconfig cmake macfuse qt@5
       - name: Build
         run: |
+          export PATH="/usr/local/opt/qt@5/bin:$PATH"
+          export LDFLAGS="-L/usr/local/opt/qt@5/lib"
+          export CPPFLAGS="-I/usr/local/opt/qt@5/include"
+          export PKG_CONFIG_PATH="/usr/local/opt/qt@5/lib/pkgconfig"
+
           mkdir build
           cd build
           cmake ..

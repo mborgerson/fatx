@@ -8,11 +8,12 @@ fatx
   libfatx that enables you to mount a FATX filesystem on your host system and
   interact with it using your typical system tools.
 * **pyfatx** is a Python module providing bindings to libfatx.
+* **gfatx** is a graphical utility for working with FATX disk images, built around libfatx. Note: can only browse filesystem at the moment.
 
 Status
 ------
 **libfatx** provides both read and write access to existing FATX formatted
-drives. It does not have the ability to create or format new drives.
+drives.
 
 fatxfs: FUSE filesystem driver
 ------------------------------
@@ -108,6 +109,20 @@ The pyfatx library can be installed via:
 A FATX filesystem can be extracted with:
 
     $ python -m pyfatx -x ./path/to/disk.img
+
+gfatx
+-----
+
+
+### Build on Windows
+* Install Visual Studio 2019
+* Install Qt (5.15.2)
+* From Start menu, launch a Qt 5.15.2 + MSVC 2019 command prompt
+* Run `"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat" amd64`
+* `mkdir build`
+* `cd build`
+* `cmake --build build --target gfatx`
+
 
 License
 -------
