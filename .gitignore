@@ -3,3 +3,4 @@ __pycache__/
 *.so
 *.egg-info
 CMakeLists.txt.user
+dist
