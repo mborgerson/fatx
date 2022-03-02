@@ -27,7 +27,7 @@
 /*
  * Open a device.
  */
-int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size, size_t sectors_per_cluster)
+int fatx_open_device(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster)
 {
     int retval = 0;
     size_t cluster_limit = 0;

@@ -15,16 +15,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-cmake_minimum_required(VERSION 2.6)
+pkg_search_module(FUSE fuse)
+if(FUSE_MODULE_NAME)
 
-project(fatxfs)
+set(FATXFS_SOURCES ${FATXFS_SOURCES}
+                   ${CMAKE_CURRENT_SOURCE_DIR}/fatxfs_fuse.c
+                   )
 
-find_package(PkgConfig)
+add_executable(fatxfs ${FATXFS_SOURCES})
+target_link_libraries(fatxfs fatx ${FUSE_LDFLAGS})
+target_include_directories(fatxfs PUBLIC ${FUSE_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/libfatx)
+target_compile_options(fatxfs PUBLIC ${FUSE_CFLAGS_OTHER})
+install(TARGETS fatxfs DESTINATION bin)
 
-set(FATX_SOURCES "")
-add_subdirectory(${CMAKE_SOURCE_DIR}/libfatx)
-add_library(fatx ${FATX_SOURCES})
-target_compile_options(fatx PUBLIC -D_FILE_OFFSET_BITS=64)
-set_target_properties(fatx PROPERTIES POSITION_INDEPENDENT_CODE ON)
+find_program(RONN NAMES ronn)
+add_custom_target(fatxfs.1 ${RONN} < ${CMAKE_SOURCE_DIR}/man/fatxfs.1.ronn
+                                   > ${CMAKE_BINARY_DIR}/fatxfs.1)
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/fatxfs)
+endif()

@@ -17,7 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
- #include "fatx_internal.h"
+#include "fatx_internal.h"
+#include <stdlib.h>
 
 /*
  * Populate a fatx_attr struct given a low-level directory entry.
@@ -109,39 +110,23 @@ int fatx_get_attr_dir(struct fatx_fs *fs, char const *path, char const *start, s
     return status;
 }
 
-int fatx_get_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr)
+int fatx_get_attr(struct fatx_fs *fs, const char *path, struct fatx_attr *attr)
 {
     struct fatx_dir dir;
     struct fatx_dirent dirent;
     int status;
-    char const *start;
-    size_t len, component;
+    char *path_dirname, *path_basename;
 
     fatx_debug(fs, "fatx_get_attr(path=\"%s\")\n", path);
 
-    char subpath[strlen(path)+1];
-
-    /* Get up to last path component. */
-    for (component=0; 1; component++)
-    {
-        status = fatx_get_path_component(path, component, &start, &len);
-        if (status) return status;
-
-        if (start == NULL)
-        {
-            /* Reached last path component. */
-            fatx_get_path_component(path, component-1, &start, &len);
-            len = start-path;
-            memcpy(subpath, path, len);
-            subpath[len] = '\0';
-            break;
-        }
-    }
-
-    status = fatx_open_dir(fs, subpath, &dir);
+    path_dirname = fatx_dirname(path);
+    status = fatx_open_dir(fs, path_dirname, &dir);
+    free(path_dirname);
     if (status) return status;
 
-    status = fatx_get_attr_dir(fs, path, start, &dir, &dirent, attr);
+    path_basename = fatx_basename(path);
+    status = fatx_get_attr_dir(fs, path, path_basename, &dir, &dirent, attr);
+    free(path_basename);
 
     fatx_close_dir(fs, &dir);
     return status;
@@ -156,41 +141,21 @@ int fatx_set_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr)
     struct fatx_dirent dirent;
     struct fatx_attr old_attr;
     int status;
-    char const *start;
-    size_t len, component;
+    char *path_dirname, *path_basename;
 
     fatx_debug(fs, "fatx_write_attr(path=\"%s\")\n", path);
 
-    char subpath[strlen(path)+1];
-
-    /* Get up to last path component. */
-    for (component=0; 1; component++)
-    {
-        status = fatx_get_path_component(path, component, &start, &len);
-        if (status) return status;
-
-        if (start == NULL)
-        {
-            /* Reached last path component. */
-            fatx_get_path_component(path, component-1, &start, &len);
-            len = start-path;
-            memcpy(subpath, path, len);
-            subpath[len] = '\0';
-            break;
-        }
-    }
-
-    status = fatx_open_dir(fs, subpath, &dir);
+    path_dirname = fatx_dirname(path);
+    status = fatx_open_dir(fs, path_dirname, &dir);
+    free(path_dirname);
     if (status) return status;
 
-    status = fatx_get_attr_dir(fs, path, start, &dir, &dirent, &old_attr);
+    path_basename = fatx_basename(path);
+    status = fatx_get_attr_dir(fs, path, path_basename, &dir, &dirent, &old_attr);
+    free(path_basename);
     if (status) return status;
 
-    /* If the filenames differ, take the new attr's filename as truth */
-    if(attr->filename && (strcmp(dirent.filename, attr->filename) == 0))
-    {
-        strcpy(dirent.filename, attr->filename);
-    }
+    strcpy(dirent.filename, attr->filename);
 
     status = fatx_write_dir(fs, &dir, &dirent, attr);
     fatx_close_dir(fs, &dir);

@@ -36,7 +36,7 @@ struct fatx_partition_map_entry const fatx_partition_map[] = {
 /*
  * Given a drive letter, determine partition offset and size (in bytes).
  */
-int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size)
+int fatx_drive_to_offset_size(char drive_letter, uint64_t *offset, uint64_t *size)
 {
     struct fatx_partition_map_entry const *pi;
 
@@ -58,7 +58,7 @@ int fatx_drive_to_offset_size(char drive_letter, size_t *offset, size_t *size)
 /*
  * Determine the disk size (in bytes).
  */
-int fatx_disk_size(char const *path, size_t *size)
+int fatx_disk_size(char const *path, uint64_t *size)
 {
     FILE * device;
     int retval;
@@ -77,7 +77,11 @@ int fatx_disk_size(char const *path, size_t *size)
         goto cleanup;
     }
 
-    *size = ftell(device);
+#ifdef _WIN32
+    *size = _ftelli64(device);
+#else
+    *size = ftello(device);
+#endif
     retval = FATX_STATUS_SUCCESS;
 
 cleanup:
@@ -88,9 +92,9 @@ cleanup:
 /*
  * Determine the remaining disk size (in bytes) from disk offset.
  */
-int fatx_disk_size_remaining(char const *path, size_t offset, size_t *remaining_size)
+int fatx_disk_size_remaining(char const *path, uint64_t offset, uint64_t *remaining_size)
 {
-    size_t disk_size;
+    uint64_t disk_size;
 
     if (fatx_disk_size(path, &disk_size))
     {
@@ -113,7 +117,7 @@ int fatx_disk_size_remaining(char const *path, size_t offset, size_t *remaining_
 int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, enum fatx_format format_type, size_t sectors_per_cluster)
 {
     struct fatx_partition_map_entry const *pi;
-    size_t f_offset, f_size;
+    uint64_t f_offset, f_size;
 
     if (format_type == FATX_FORMAT_INVALID)
     {
@@ -172,7 +176,7 @@ int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, e
 /*
  * Format partition.
  */
-int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size, size_t sectors_per_cluster)
+int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster)
 {
     int retval;
 

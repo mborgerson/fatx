@@ -21,8 +21,10 @@
 
 #include <stddef.h>
 #include <string.h>
-#include <libgen.h>
 #include <time.h>
+#include <stdlib.h>
+
+#include "ext.h"
 
 /*
  * Get the specified path component.
@@ -99,10 +101,12 @@ int fatx_get_path_component(char const *path, size_t component, char const **sta
  * | ..       | .       |
  *
  */
-char *fatx_dirname(char *path)
+char *fatx_dirname(const char *path)
 {
-    /* TODO: Implement this natively. */
-    return dirname(path);
+    char *path_copy = strdup(path);
+    char *path_dirname = strdup(ext_dirname(path_copy));
+    free(path_copy);
+    return path_dirname;
 }
 
 /*
@@ -118,10 +122,12 @@ char *fatx_dirname(char *path)
  * | ..       | ..       |
  *
  */
-char *fatx_basename(char *path)
+char *fatx_basename(const char *path)
 {
-    /* TODO: Implement this natively. */
-    return basename(path);
+    char *path_copy = strdup(path);
+    char *path_basename = strdup(ext_basename(path_copy));
+    free(path_copy);
+    return path_basename;
 }
 
 /*

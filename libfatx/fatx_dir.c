@@ -19,6 +19,7 @@
 
 #include "fatx_internal.h"
 #include <time.h>
+#include <stdlib.h>
 
 /*
  * Open a directory.
@@ -462,24 +463,24 @@ int fatx_create_dirent(struct fatx_fs *fs, char const *path, struct fatx_dir *di
 {
     struct fatx_dirent entry;
     struct fatx_attr attr;
-    char path_buf[strlen(path)+1];
-    char *filename;
+    char *path_basename;
     int status;
     size_t cluster;
     time_t curtime;
 
     /* Check basename is not too long */
-    strcpy(path_buf, path);
-    filename = fatx_basename(path_buf);
-    if (strlen(filename) >= FATX_MAX_FILENAME_LEN)
+    path_basename = fatx_basename(path);
+    if (strlen(path_basename) >= FATX_MAX_FILENAME_LEN)
     {
+        free(path_basename);
         fatx_error(fs, "filename is too long\n");
         return FATX_STATUS_ERROR;
     }
 
     /* Prepare filename */
-    strcpy(entry.filename, filename);
-    strcpy(attr.filename, filename);
+    strcpy(entry.filename, path_basename);
+    strcpy(attr.filename, path_basename);
+    free(path_basename);
 
     /* Allocate space for the file */
     status = fatx_alloc_cluster(fs, &cluster);
@@ -521,19 +522,18 @@ int fatx_unlink(struct fatx_fs *fs, char const *path)
     struct fatx_dirent entry, *result;
     struct fatx_attr attr;
     struct fatx_dir dir;
-    char path_buf[strlen(path)+1];
-    char *filename;
+    char *path_dirname, *path_basename;
     int status;
 
     fatx_debug(fs, "fatx_unlink(path=\"%s\")\n", path);
 
     /* Open the directory that contains this file. */
-    strcpy(path_buf, path);
-    status = fatx_open_dir(fs, fatx_dirname(path_buf), &dir);
+    path_dirname = fatx_dirname(path);
+    status = fatx_open_dir(fs, path_dirname, &dir);
+    free(path_dirname);
     if (status != FATX_STATUS_SUCCESS) return status;
 
-    strcpy(path_buf, path);
-    filename = fatx_basename(path_buf);
+    path_basename = fatx_basename(path);
 
     while (1)
     {
@@ -542,7 +542,7 @@ int fatx_unlink(struct fatx_fs *fs, char const *path)
         if (status == FATX_STATUS_SUCCESS)
         {
             /* Is this the file we're looking for? */
-            if (strcmp(attr.filename, filename) == 0) break;
+            if (strcmp(attr.filename, path_basename) == 0) break;
         }
         else if (status == FATX_STATUS_END_OF_DIR)
         {
@@ -579,6 +579,7 @@ int fatx_unlink(struct fatx_fs *fs, char const *path)
     if (status != FATX_STATUS_SUCCESS) goto cleanup;
 
 cleanup:
+    free(path_basename);
     fatx_close_dir(fs, &dir);
     return status;
 }
@@ -590,7 +591,7 @@ int fatx_mkdir(struct fatx_fs *fs, char const *path)
 {
     struct fatx_attr attr;
     struct fatx_dir dir;
-    char path_buf[strlen(path)+1];
+    char *path_dirname;
     int status;
 
     fatx_debug(fs, "fatx_mkdir(path=\"%s\")\n", path);
@@ -604,8 +605,9 @@ int fatx_mkdir(struct fatx_fs *fs, char const *path)
     }
 
     /* Open the directory. */
-    strcpy(path_buf, path);
-    status = fatx_open_dir(fs, fatx_dirname(path_buf), &dir);
+    path_dirname = fatx_dirname(path);
+    status = fatx_open_dir(fs, path_dirname, &dir);
+    free(path_dirname);
     if (status) return status;
 
     /* Create the directory node */

@@ -30,10 +30,7 @@ set(FATX_SOURCES ${FATX_SOURCES}
                  ${CMAKE_CURRENT_SOURCE_DIR}/fatx_misc.c
                  ${CMAKE_CURRENT_SOURCE_DIR}/fatx_partition.c
                  ${CMAKE_CURRENT_SOURCE_DIR}/fatx_version.h
+                 ${CMAKE_CURRENT_SOURCE_DIR}/ext.h
+                 ${CMAKE_CURRENT_SOURCE_DIR}/ext.c
                  PARENT_SCOPE
                  )
-
-set(FATXFS_SOURCES ${FATXFS_SOURCES}
-                   ${CMAKE_CURRENT_SOURCE_DIR}/fatxfs_fuse.c
-                   PARENT_SCOPE
-                   )

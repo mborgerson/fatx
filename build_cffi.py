@@ -7,9 +7,13 @@ from distutils.command.build_ext import build_ext
 
 
 ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
-SRC_DIR = os.path.join(ROOT_DIR, 'src')
+LIBFATX_DIR = os.path.join(ROOT_DIR, 'libfatx')
 BUILD_DIR = os.path.join(ROOT_DIR, 'build')
 
+if platform.system() == 'Windows':
+    LIBRARY_DIR = os.path.join(BUILD_DIR, 'Release')
+else:
+    LIBRARY_DIR = BUILD_DIR
 
 class FfiPreBuildExtension(build_ext):
     def pre_run(self, ext, ffi):
@@ -20,7 +24,6 @@ class FfiPreBuildExtension(build_ext):
 
         cmake_config_args = [
             '-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON',
-            '-DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE',
             ]
         cmake_build_args = []
         if platform.system() == 'Windows':
@@ -28,7 +31,6 @@ class FfiPreBuildExtension(build_ext):
             cmake_config_args += ['-A', 'x64' if is_64b else 'Win32']
             cmake_build_args += ['--config', 'Release']
 
-        # Build sleigh and csleigh library
         subprocess.check_call(['cmake', '-B', 'build'] + cmake_config_args, cwd=ROOT_DIR)
         subprocess.check_call(['cmake', '--build', 'build', '--parallel', '--verbose', '--target', 'fatx'] + cmake_build_args, cwd=ROOT_DIR)
 
@@ -51,8 +53,8 @@ def ffibuilder():
 
         """,
         libraries=['fatx'],
-        include_dirs=[SRC_DIR],
-        library_dirs=[BUILD_DIR])
+        include_dirs=[LIBFATX_DIR],
+        library_dirs=[LIBRARY_DIR])
     ffi.cdef("""
         struct fatxfs;
 
@@ -88,7 +90,7 @@ def ffibuilder():
 
         struct fatx_fs *pyfatx_open_helper(void);
 
-        int fatx_open_device(struct fatx_fs *fs, char const *path, size_t offset, size_t size, size_t sector_size, size_t sectors_per_cluster);
+        int fatx_open_device(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster);
         int fatx_close_device(struct fatx_fs *fs);
         int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir);
         int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *entry, struct fatx_attr *attr, struct fatx_dirent **result);
