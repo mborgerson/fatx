@@ -107,6 +107,7 @@ struct fatx_superblock {
     uint8_t  padding[4078];
 };
 #pragma pack()
+
 _Static_assert(sizeof(struct fatx_superblock) == 4096, "fatx_superblock struct *must* be 4096 bytes");
 
 /*
