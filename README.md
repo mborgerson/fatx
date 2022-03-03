@@ -127,9 +127,9 @@ make gfatx
 ```
 
 ### Build on Windows
-* Install Visual Studio 2019
-* Install Qt (5.15.2)
-* From Start menu, launch a Qt 5.15.2 + MSVC 2019 command prompt
+* Install Visual Studio 2019 Community
+* Install Qt 5.15.2. I recommend using the Qt open source online installer.
+* From Start menu, launch a "Qt 5.15.2 + MSVC 2019" command prompt
 
 ```
 "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat" amd64
