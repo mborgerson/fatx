@@ -10,7 +10,7 @@ Original Xbox FATX Filesystem Library, Python bindings, FUSE driver, and GUI exp
 
 libfatx
 -------
-**libfatx** provides both read and write access to FATX filesystems, and reformatting disks. Large disks are supported via F partition.
+**libfatx** provides both read and write access to FATX filesystems, and formatting disks. Large disks are supported via F partition.
 
 fatxfs
 ------
