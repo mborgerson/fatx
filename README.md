@@ -1,29 +1,23 @@
 fatx
 ====
-* **libfatx** is a C library for working with the FATX filesystem, a variant of
-  FAT16/32 developed by Microsoft for the original Xbox console. It does not
-  have the ability to create or format new drives yet.
-* **fatxfs** is a [FUSE userspace filesystem
-  driver](https://en.wikipedia.org/wiki/Filesystem_in_Userspace) built using
-  libfatx that enables you to mount a FATX filesystem on your host system and
-  interact with it using your typical system tools.
-* **pyfatx** is a Python module providing bindings to libfatx.
-* **gfatx** is a graphical utility for working with FATX disk images, built around libfatx.
 
-Status
+Original Xbox FATX Filesystem Library, Python bindings, FUSE driver, and GUI explorer.
+
+* [**libfatx**](#libfatx) is a C library for working with the FATX filesystem, a variant of FAT16/32 developed by Microsoft for the original Xbox console.
+* [**fatxfs**](#fatxfs) is a [FUSE driver](https://en.wikipedia.org/wiki/Filesystem_in_Userspace) built using libfatx.
+* [**pyfatx**](#pyfatx) is a Python module providing bindings to libfatx.
+* [**gfatx**](#gfatx) is a graphical utility for working with FATX disk images, built around libfatx.
+
+libfatx
+-------
+**libfatx** provides both read and write access to FATX filesystems, and reformatting disks. Large disks are supported via F partition.
+
+fatxfs
 ------
-**libfatx** provides both read and write access to existing FATX formatted
-drives.
-
-fatxfs: FUSE filesystem driver
-------------------------------
-### Platform Support
-Works on Linux and macOS. Other platform support is possible, but untested.
+A [FUSE userspace filesystem driver](https://en.wikipedia.org/wiki/Filesystem_in_Userspace) built using libfatx that enables you to mount a FATX filesystem on your host system and interact with it using your typical system tools. Works on Linux and macOS. Other platform support is possible, but untested.
 
 ### Build via Docker
-fatxfs can be easily built inside a [Docker](https://www.docker.com/)
-container. If you use this method, you can skip the prerequisites and
-build instructions below.
+fatxfs can be easily built inside a [Docker](https://www.docker.com/) container. If you use this method, you can skip the prerequisites and build instructions below.
 
     $ git clone https://github.com/mborgerson/fatx
     $ docker build -t fatxfs .
@@ -63,9 +57,7 @@ Finally, start the build:
     $ make
 
 ### How to Use
-Firstly, you will need a raw disk image or block device to mount. Then, you can
-simply create a mountpoint and mount the "C drive" (default behavior). For
-example:
+Firstly, you will need a raw disk image or block device to mount. Then, you can simply create a mountpoint and mount the "C drive" (default behavior). For example:
 
     $ mkdir c_drive
     $ ./fatxfs /dev/nbd0 c_drive
@@ -81,17 +73,14 @@ Or, you can specify the offset and size of the partition manually:
 
 ### Tips
 #### Mounting a qcow Image
-If your disk image is a [qcow](https://en.wikipedia.org/wiki/Qcow) image, you
-can mount it as a network block device before mounting a partition on the
-device:
+If your disk image is a [qcow](https://en.wikipedia.org/wiki/Qcow) image, you can mount it as a network block device before mounting a partition on the device:
 
     $ sudo apt-get install qemu-utils
     $ sudo modprobe nbd max_part=8
     $ sudo qemu-nbd --connect=/dev/nbd0 /path/to/your/image.qcow2
     $ sudo chmod a+rwx /dev/nbd0
 
-Unfortunately, on OS X, there is not a way to mount a qcow image like this
-(AFAIK). I recommend converting the qcow image to a raw disk image.
+Unfortunately, on OS X, there is not a way to mount a qcow image like this (AFAIK). I recommend converting the qcow image to a raw disk image.
 
     $ qemu-img convert /path/to/image.qcow /path/to/output.raw
 
@@ -104,20 +93,28 @@ pyfatx
 ------
 [![pypi](https://img.shields.io/pypi/v/pyfatx)](https://pypi.org/project/pyfatx/)
 
-The pyfatx library can be installed via:
+A Python module providing bindings to libfatx. Wheels are provided for Windows and Linux.
 
-    $ pip install pyfatx
+The latest release of pyfatx can be installed via:
 
-A FATX filesystem can be extracted with:
+    pip install pyfatx
 
-    $ python -m pyfatx -x ./path/to/disk.img
+You can install the latest version from source with:
+
+    pip install git+https://github.com/mborgerson/fatx
+
+pyfatx provides a module with some helpful utilities, like listing drive contents and extracting a filesystem, e.g. a filesystem can be extracted with:
+
+    python -m pyfatx -x ./path/to/disk.img
 
 gfatx
 -----
 
-![gfatx](screenshots/gfatx.png)
+A graphical utility for working with FATX disk images, built around libfatx.
 
-Note: In a very early state. Can only browse filesystem at the moment.
+Note: This tool is in a very early state, and only has the functionality to browse filesystem at the moment.
+
+![gfatx](screenshots/gfatx.png)
 
 ### Build on Ubuntu
 ```
@@ -169,5 +166,4 @@ License
 
 Credit
 ------
-This project was made possible in part by the research done by Andrew de
-Quincey, Lucien Murray-Pitts, and Michael Steil. Thank you!
+This project was made possible in part by the research done by Andrew de Quincey, Lucien Murray-Pitts, and Michael Steil. Thank you!
