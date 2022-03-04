@@ -2,8 +2,12 @@
 import os
 import argparse
 import hashlib
+import logging
 
 from pyfatx import Fatx
+
+
+logging.basicConfig(level=logging.INFO)
 
 
 def main():
@@ -17,8 +21,14 @@ def main():
 	ap.add_argument('--sha256', action='store_true', help='Calculate SHA256 digest of files in listing')
 	ap.add_argument('--verbose', '-v', action='store_true', help='Verbose mode')
 	ap.add_argument('--format', action='store_true', help='Format the disk')
+	ap.add_argument('--create', action='store_true', help='Create a new disk image and format it')
 	ap.add_argument('device')
 	args = ap.parse_args()
+
+	if args.create:
+		print(f'Creating {args.device}')
+		Fatx.create(args.device)
+		return
 
 	if args.format:
 		print(f'Formatting {args.device}')

@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 import os
+import platform
+import subprocess
+import logging
 from typing import Optional, Generator, Tuple, Sequence
 
 from .libfatx import ffi
 from .libfatx.lib import *
+
+
+log = logging.getLogger(__name__)
 
 
 class FatxAttr:
@@ -153,8 +159,33 @@ class Fatx:
 		return ffi.buffer(buf)
 
 	@classmethod
-	def format(cls, device_path:str):
+	def format(cls, path:str):
+		"""
+		Format a device.
+		"""
+		log.info('Formatting...')
 		fs = pyfatx_open_helper()
-		s = fatx_disk_format(fs, device_path.encode('utf-8'), 512, 1, 128)
+		s = fatx_disk_format(fs, path.encode('utf-8'), 512, 1, 128)
 		# FIXME: Leaks fs
 		assert s == 0
+
+	@classmethod
+	def create(cls, path:str, size:int = 8*1024*1024*1024):
+		"""
+		Create a disk image.
+		"""
+		if os.path.exists(path):
+			raise FileExistsError()
+
+		log.info('Creating empty disk image at %s...', path)
+		plat = platform.system()
+		if plat == 'Windows':
+			subprocess.run(['fsutil', 'file', 'createnew', path, str(size)], check=True)
+		elif plat == 'Linux':
+			subprocess.run(['fallocate', '-l', str(size), path])
+		elif plat == 'Darwin':
+			subprocess.run(['mkfile', '-n', str(size), path])
+		else:
+			assert False
+
+		Fatx.format(path)
