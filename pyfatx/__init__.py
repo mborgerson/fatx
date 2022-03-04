@@ -79,6 +79,7 @@ class Fatx:
 			path = path.encode('utf-8')
 		if not path.startswith(b'/'):
 			path = b'/' + path
+		path = path.replace(b'\\', b'/')
 		return path
 
 	def _create_attr(self, in_attr):
