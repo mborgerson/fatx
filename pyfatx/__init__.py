@@ -73,6 +73,7 @@ class Fatx:
 	def __del__(self):
 		if self.fs is not None:
 			fatx_close_device(self.fs)
+			# FIXME: Leaks fs
 
 	def _sanitize_path(self, path):
 		if isinstance(path, str):
@@ -150,3 +151,10 @@ class Fatx:
 		s = fatx_read(self.fs, path, offset, size, buf)
 		assert s == size
 		return ffi.buffer(buf)
+
+	@classmethod
+	def format(cls, device_path:str):
+		fs = pyfatx_open_helper()
+		s = fatx_disk_format(fs, device_path.encode('utf-8'), 512, 1, 128)
+		# FIXME: Leaks fs
+		assert s == 0

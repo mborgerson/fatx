@@ -16,8 +16,13 @@ def main():
 	ap.add_argument('--list', '-l', action='store_true', help='List filesystem contents')
 	ap.add_argument('--sha256', action='store_true', help='Calculate SHA256 digest of files in listing')
 	ap.add_argument('--verbose', '-v', action='store_true', help='Verbose mode')
+	ap.add_argument('--format', action='store_true', help='Format the disk')
 	ap.add_argument('device')
 	args = ap.parse_args()
+
+	if args.format:
+		print(f'Formatting {args.device}')
+		Fatx.format(args.device)
 
 	fs = Fatx(args.device, offset=args.offset, size=args.size, drive=args.drive, sector_size=args.sector_size)
 	if args.list:
