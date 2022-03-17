@@ -243,11 +243,7 @@ int fatx_write(struct fatx_fs *fs, char const *path, off_t offset, size_t size, 
         size_t bytes_written;
 
         /* Careful not to overflow */
-        bytes_to_write = size - total_bytes_written;
-        if(fs->bytes_per_cluster >= cluster_offset)
-        {
-            bytes_to_write = MIN(fs->bytes_per_cluster - cluster_offset, bytes_to_write);   
-        }
+        bytes_to_write = MIN(fs->bytes_per_cluster - cluster_offset, size - total_bytes_written);
 
         /* Write to the current cluster if we have space. */
         if (bytes_to_write > 0)
@@ -286,6 +282,8 @@ int fatx_write(struct fatx_fs *fs, char const *path, off_t offset, size_t size, 
 
                 status = fatx_attach_cluster(fs, cluster, new_cluster);
                 if (status) return status;
+
+                cluster = new_cluster;
             }
 
             status = fatx_dev_seek_cluster(fs, cluster, 0);

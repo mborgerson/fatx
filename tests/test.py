@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import unittest
 import hashlib
+import random
 
 from pyfatx import Fatx
 
@@ -67,6 +68,20 @@ class BasicTest(unittest.TestCase):
 
 		fs.unlink(new_filename)
 
+	def test_write_large_file(self):
+		test_file_path = '/largefile'
+		fs = Fatx('xbox_hdd.img')
+
+		rng = random.Random()
+		rng.seed(12345)
+		b = bytes([rng.getrandbits(8) for _ in range(1024 * 1024)])
+		
+		fs.write(test_file_path, b)
+
+		d = fs.read(test_file_path)
+		fs.unlink(test_file_path)
+
+		assert d == b
 
 if __name__ == '__main__':
 	unittest.main()
