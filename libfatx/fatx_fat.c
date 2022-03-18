@@ -327,6 +327,7 @@ int fatx_alloc_cluster(struct fatx_fs *fs, size_t *cluster)
     int status;
     fatx_fat_entry fat_entry;
     size_t i;
+    void *zero;
 
     fatx_debug(fs, "fatx_alloc_cluster()\n");
 
@@ -349,6 +350,16 @@ int fatx_alloc_cluster(struct fatx_fs *fs, size_t *cluster)
 
     status = fatx_mark_cluster_end(fs, i);
     if (status != FATX_STATUS_SUCCESS) return status;
+
+    status = fatx_dev_seek_cluster(fs, i, 0);
+    if (status != FATX_STATUS_SUCCESS) return status;
+
+    zero = calloc(1, fs->bytes_per_cluster);
+    if (!zero) return FATX_STATUS_ERROR;
+
+    status = fatx_dev_write(fs, zero, fs->bytes_per_cluster, 1);
+    free(zero);
+    if (status != 1) return status;
 
     *cluster = i;
 
