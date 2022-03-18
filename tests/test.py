@@ -83,5 +83,33 @@ class BasicTest(unittest.TestCase):
 
 		assert d == b
 
+	
+	def test_write_offset(self):
+		test_file_path = '/offsetfile'
+		fs = Fatx('xbox_hdd.img')
+
+		rng = random.Random()
+		rng.seed(12345)
+
+		# Write 1KB of random data
+		b = bytes([rng.getrandbits(8) for _ in range(1024)])
+		fs.write(test_file_path, b)
+
+		# Delete the data
+		d = fs.read(test_file_path)
+		fs.unlink(test_file_path)
+		assert d == b
+
+		# Write 512KB of random data at offset 128
+		b = bytes([rng.getrandbits(8) for _ in range(1024 * 512)])
+		fs.write(test_file_path, b, offset=128)
+
+		# Read from offset zero
+		d = fs.read(test_file_path)
+		fs.unlink(test_file_path)
+
+		assert d == bytes([0] * 128) + b
+
+
 if __name__ == '__main__':
 	unittest.main()
