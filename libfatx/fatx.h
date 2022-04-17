@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/types.h>
 
@@ -62,24 +63,35 @@ extern "C" {
  */
 #define FATX_READ_FROM_SUPERBLOCK    0
 
+#define FATX_FAT_CACHE_NUM_ENTRIES   512
+
+struct fatx_cache {
+    size_t position;
+    size_t entries;
+    size_t entry_size;
+    bool   dirty;
+    void  *data;
+};
+
 struct fatx_fs {
-    char const *device_path;
-    FILE       *device;
-    size_t      sector_size;
-    uint64_t    partition_offset;
-    uint64_t    partition_size;
-    uint32_t    volume_id;
-    uint64_t    num_sectors;
-    uint32_t    num_clusters;
-    uint32_t    sectors_per_cluster;
-    uint8_t     fat_type;
-    uint64_t    fat_offset;
-    size_t      fat_size;
-    size_t      root_cluster;
-    uint64_t    cluster_offset;
-    size_t      bytes_per_cluster;
-    FILE       *log_handle;
-    int         log_level;
+    char const       *device_path;
+    FILE             *device;
+    size_t            sector_size;
+    uint64_t          partition_offset;
+    uint64_t          partition_size;
+    uint32_t          volume_id;
+    uint64_t          num_sectors;
+    uint32_t          num_clusters;
+    uint32_t          sectors_per_cluster;
+    uint8_t           fat_type;
+    uint64_t          fat_offset;
+    size_t            fat_size;
+    size_t            root_cluster;
+    uint64_t          cluster_offset;
+    size_t            bytes_per_cluster;
+    FILE             *log_handle;
+    int               log_level;
+    struct fatx_cache fat_cache;
 };
 
 struct fatx_dir {

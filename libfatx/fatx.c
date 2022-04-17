@@ -66,6 +66,8 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, uint64_t offset, uint
     fs->partition_offset = offset;
     fs->partition_size   = size;
 
+    memset(&fs->fat_cache, 0, sizeof(fs->fat_cache));
+
     fs->device = fopen(fs->device_path, "r+b");
     if (!fs->device)
     {
@@ -163,6 +165,11 @@ cleanup:
  */
 int fatx_close_device(struct fatx_fs *fs)
 {
+    int status;
+
+    fatx_debug(fs, "fatx_close_device()\n");
+
+    status = fatx_flush_fat_cache(fs);
     fclose(fs->device);
-    return FATX_STATUS_SUCCESS;
+    return status;
 }
