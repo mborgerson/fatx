@@ -146,6 +146,7 @@ size_t fatx_dev_write(struct fatx_fs *fs, const void *buf, size_t size, size_t i
 /* FAT Functions */
 int fatx_init_fat(struct fatx_fs *fs);
 int fatx_init_root(struct fatx_fs *fs);
+int fatx_flush_fat_cache(struct fatx_fs *fs);
 int fatx_read_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry *entry);
 int fatx_write_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry entry);
 int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, uint64_t *offset);
