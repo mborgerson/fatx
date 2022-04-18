@@ -359,7 +359,7 @@ int fatx_alloc_dir_entry(struct fatx_fs *fs, struct fatx_dir *dir)
     }
 
     /* If all else fails, then allocate a new cluster */
-    status = fatx_alloc_cluster(fs, &new_cluster);
+    status = fatx_alloc_cluster(fs, &new_cluster, true);
     if (status) return status;
 
     status = fatx_attach_cluster(fs, dir->cluster, new_cluster);
@@ -483,7 +483,7 @@ int fatx_create_dirent(struct fatx_fs *fs, char const *path, struct fatx_dir *di
     free(path_basename);
 
     /* Allocate space for the file */
-    status = fatx_alloc_cluster(fs, &cluster);
+    status = fatx_alloc_cluster(fs, &cluster, true);
     if (status) return status;
 
     /* Allocate directory entry for file */

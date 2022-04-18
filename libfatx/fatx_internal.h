@@ -155,7 +155,7 @@ int fatx_get_next_cluster(struct fatx_fs *fs, size_t *cluster);
 int fatx_mark_cluster_available(struct fatx_fs *fs, size_t cluster);
 int fatx_mark_cluster_end(struct fatx_fs *fs, size_t cluster);
 int fatx_free_cluster_chain(struct fatx_fs *fs, size_t first_cluster);
-int fatx_alloc_cluster(struct fatx_fs *fs, size_t *cluster);
+int fatx_alloc_cluster(struct fatx_fs *fs, size_t *cluster, bool zero);
 int fatx_attach_cluster(struct fatx_fs *fs, size_t tail, size_t cluster);
 
 /* Directory Functions */
