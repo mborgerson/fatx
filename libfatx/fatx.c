@@ -30,7 +30,6 @@
 int fatx_open_device(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster)
 {
     int retval = 0;
-    size_t cluster_limit = 0;
 
     if (sector_size != 512 && sector_size != 4096)
     {
@@ -101,13 +100,13 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, uint64_t offset, uint
     }
 
     fs->num_sectors       = fs->partition_size / fs->sector_size;
-    fs->num_clusters      = fs->num_sectors / fs->sectors_per_cluster;
     fs->bytes_per_cluster = fs->sectors_per_cluster * fs->sector_size;
     fs->fat_offset        = fs->partition_offset + FATX_FAT_OFFSET;
+    fs->fat_size          = fs->partition_size / fs->bytes_per_cluster;
 
-    cluster_limit = fs->num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT;
+    fs->fat_size += FATX_FAT_RESERVED_ENTRIES_COUNT;
 
-    if (fs->root_cluster >= cluster_limit)
+    if (fs->root_cluster >= fs->fat_size)
     {
         fatx_error(fs, "root cluster %d exceeds cluster limit\n", fs->root_cluster);
         retval = FATX_STATUS_ERROR;
@@ -115,15 +114,15 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, uint64_t offset, uint
     }
 
     /* NOTE: this *MUST* be kept below the Cluster Reserved marker for FAT16 */
-    if (fs->num_clusters < 0xfff0)
+    if (fs->fat_size < 0xfff0)
     {
         fs->fat_type = FATX_FAT_TYPE_16;
-        fs->fat_size = cluster_limit*2;
+        fs->fat_size *= 2;
     }
     else
     {
         fs->fat_type = FATX_FAT_TYPE_32;
-        fs->fat_size = cluster_limit*4;
+        fs->fat_size *= 4;
     }
 
     /* Round FAT size up to nearest 4k boundary. */
@@ -134,6 +133,8 @@ int fatx_open_device(struct fatx_fs *fs, char const *path, uint64_t offset, uint
 
     /* Calculate start of data clusters. */
     fs->cluster_offset = fs->fat_offset + fs->fat_size;
+    fs->num_clusters = (fs->partition_size - fs->fat_size - FATX_FAT_OFFSET) / fs->bytes_per_cluster;
+    fs->num_clusters += FATX_FAT_RESERVED_ENTRIES_COUNT;
 
     fatx_info(fs, "Partition Info:\n");
     fatx_info(fs, "  Device Path:         %s\n",          fs->device_path);

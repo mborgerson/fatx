@@ -232,6 +232,13 @@ int fatx_cluster_number_to_byte_offset(struct fatx_fs *fs, size_t cluster, uint6
     *offset = fs->cluster_offset
               + (cluster - FATX_FAT_RESERVED_ENTRIES_COUNT) * fs->bytes_per_cluster;
 
+    if (*offset >= fs->partition_offset + fs->partition_size)
+    {
+        fatx_error(fs, "Cluster %d has overrun partition limit !!!\n", cluster);
+        fatx_error(fs, "Bailing to avoid corruption");
+        return FATX_STATUS_ERROR;
+    }
+
     return FATX_STATUS_SUCCESS;
 }
 
@@ -322,17 +329,31 @@ int fatx_free_cluster_chain(struct fatx_fs *fs, size_t first_cluster)
 /*
  * Find an available cluster.
  */
-int fatx_alloc_cluster(struct fatx_fs *fs, size_t *cluster)
+int fatx_alloc_cluster(struct fatx_fs *fs, size_t *cluster, bool zero)
 {
     int status;
     fatx_fat_entry fat_entry;
-    size_t i;
-    void *zero;
+    static size_t i = 2;
+    size_t wraparound;
+    void *zero_buf;
 
-    fatx_debug(fs, "fatx_alloc_cluster()\n");
+    fatx_debug(fs, "fatx_alloc_cluster(zero: %s)\n", zero ? "true" : "false");
 
-    for (i=2; 1; i++)
+    wraparound = i - 1;
+
+    for (; 1; i++)
     {
+        if (i >= fs->num_clusters)
+        {
+            i = 2;
+        }
+
+        if (i == wraparound)
+        {
+            fatx_error(fs, "no clusters available to allocate\n");
+            return FATX_STATUS_ERROR;
+        }
+
         status = fatx_read_fat(fs, i, &fat_entry);
         if (status != FATX_STATUS_SUCCESS)
         {
@@ -354,12 +375,15 @@ int fatx_alloc_cluster(struct fatx_fs *fs, size_t *cluster)
     status = fatx_dev_seek_cluster(fs, i, 0);
     if (status != FATX_STATUS_SUCCESS) return status;
 
-    zero = calloc(1, fs->bytes_per_cluster);
-    if (!zero) return FATX_STATUS_ERROR;
+    if (zero)
+    {
+        zero_buf = calloc(1, fs->bytes_per_cluster);
+        if (!zero_buf) return FATX_STATUS_ERROR;
 
-    status = fatx_dev_write(fs, zero, fs->bytes_per_cluster, 1);
-    free(zero);
-    if (status != 1) return status;
+        status = fatx_dev_write(fs, zero_buf, fs->bytes_per_cluster, 1);
+        free(zero_buf);
+        if (status != 1) return status;
+    }
 
     *cluster = i;
 

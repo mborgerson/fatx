@@ -62,7 +62,7 @@ int fatx_find_cluster_for_file_offset_alloc(struct fatx_fs *fs, struct fatx_attr
         {
             fatx_debug(fs, "out of clusters, allocating new one\n");
 
-            status = fatx_alloc_cluster(fs, &alloc_cluster);
+            status = fatx_alloc_cluster(fs, &alloc_cluster, true);
             if (status) return status;
 
             status = fatx_attach_cluster(fs, cluster, alloc_cluster);
@@ -276,8 +276,9 @@ int fatx_write(struct fatx_fs *fs, char const *path, off_t offset, size_t size, 
             {
                 fatx_debug(fs, "EOF, allocating new cluster\n");
 
+                /* If we're going to write to the entire cluster, there's no need to zero it */
                 size_t new_cluster;
-                status = fatx_alloc_cluster(fs, &new_cluster);
+                status = fatx_alloc_cluster(fs, &new_cluster, size - total_bytes_written < fs->bytes_per_cluster);
                 if (status) return status;
 
                 status = fatx_attach_cluster(fs, cluster, new_cluster);
@@ -363,7 +364,7 @@ int fatx_truncate(struct fatx_fs *fs, char const *path, off_t offset)
         {
             /* Out of clusters, alloc more */
             size_t new_cluster;
-            status = fatx_alloc_cluster(fs, &new_cluster);
+            status = fatx_alloc_cluster(fs, &new_cluster, true);
             if (status) return status;
 
             status = fatx_attach_cluster(fs, cluster, new_cluster);
