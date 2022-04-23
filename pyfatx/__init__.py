@@ -197,7 +197,7 @@ class Fatx:
 		s = fatx_write(self.fs, path, offset, len(content), content)
 		assert s == len(content)
 
-	def rename(self, current_name: str, new_name: str):
+	def rename(self, current_name: str, new_name: str, exchange=False, no_replace=False):
 		"""
 		Rename an existing file.
 
@@ -211,7 +211,7 @@ class Fatx:
 		assert attr.is_file
 
 		to_path = self._sanitize_path(new_name)
-		s = fatx_rename(self.fs, from_path, to_path)
+		s = fatx_rename(self.fs, from_path, to_path, exchange, no_replace)
 		assert s == 0
 
 	def truncate(self, path: AnyStr, new_size: int):
@@ -230,6 +230,22 @@ class Fatx:
 		"""
 		path = self._sanitize_path(path)
 		s = fatx_unlink(self.fs, path)
+		assert s == 0
+
+	def mkdir(self, path: AnyStr):
+		"""
+		Create a directory.
+		"""
+		path = self._sanitize_path(path)
+		s = fatx_mkdir(self.fs, path)
+		assert s == 0
+
+	def rmdir(self, path: AnyStr):
+		"""
+		Remove a directory.
+		"""
+		path = self._sanitize_path(path)
+		s = fatx_rmdir(self.fs, path)
 		assert s == 0
 
 	@classmethod

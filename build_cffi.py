@@ -109,7 +109,7 @@ def ffibuilder():
         int fatx_rmdir(struct fatx_fs *fs, char const *path);
         int fatx_mknod(struct fatx_fs *fs, char const *path);
         int fatx_truncate(struct fatx_fs *fs, char const *path, off_t offset);
-        int fatx_rename(struct fatx_fs *fs, char const *from, char const *to);
+        int fatx_rename(struct fatx_fs *fs, char const *from, char const *to, bool exchange, bool no_replace);
         int fatx_disk_size(char const *path, uint64_t *size);
         int fatx_disk_size_remaining(char const *path, uint64_t offset, uint64_t *size);
         int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, enum fatx_format format_type, size_t sectors_per_cluster);

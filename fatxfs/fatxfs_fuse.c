@@ -450,7 +450,7 @@ int fatx_fuse_rename(const char *from, const char *to)
 
     fatx_debug(pd->fs, "fatx_fuse_rename(from=\"%s\", to=\"%s\")\n", from, to);
 
-    status = fatx_rename(pd->fs, from, to);
+    status = fatx_rename(pd->fs, from, to, false, false);
     return (status == FATX_STATUS_SUCCESS ? 0 : -1);
 }
 

@@ -149,6 +149,7 @@ int fatx_alloc_dir_entry(struct fatx_fs *fs, struct fatx_dir *dir);
 int fatx_close_dir(struct fatx_fs *fs, struct fatx_dir *dir);
 int fatx_get_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr);
 int fatx_set_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr);
+int fatx_attr_atomic_swap(struct fatx_fs *fs, char const *dir1, char const *base1, char const *dir2, char const *base2);
 int fatx_utime(struct fatx_fs *fs, char const *path, struct fatx_ts ts[2]);
 int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, void *buf);
 int fatx_write(struct fatx_fs *fs, char const *path, off_t offset, size_t size, const void *buf);
@@ -158,7 +159,7 @@ int fatx_mkdir(struct fatx_fs *fs, char const *path);
 int fatx_rmdir(struct fatx_fs *fs, char const *path);
 int fatx_mknod(struct fatx_fs *fs, char const *path);
 int fatx_truncate(struct fatx_fs *fs, char const *path, off_t offset);
-int fatx_rename(struct fatx_fs *fs, char const *from, char const *to);
+int fatx_rename(struct fatx_fs *fs, char const *from, char const *to, bool exchange, bool no_replace);
 void fatx_time_t_to_fatx_ts(const time_t in, struct fatx_ts *out);
 time_t fatx_ts_to_time_t(struct fatx_ts *in);
 
