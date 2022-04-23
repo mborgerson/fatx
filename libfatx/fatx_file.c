@@ -405,44 +405,107 @@ int fatx_truncate(struct fatx_fs *fs, char const *path, off_t offset)
 /*
  * Rename a file
  */
-int fatx_rename(struct fatx_fs *fs, char const *from, char const *to)
+int fatx_rename(struct fatx_fs *fs, char const *from, char const *to, bool exchange, bool no_replace)
 {
     fatx_debug(fs, "fatx_rename(from=\"%s\", to=\"%s\")\n", from, to);
 
-    struct fatx_attr attr;
-    char *from_dirname, *to_dirname;
-    char *to_basename;
+    struct fatx_attr attr_from, attr_to;
+    char *from_dirname = 0, *to_dirname = 0;
+    char *from_basename = 0, *to_basename = 0;
     int path_dif, status;
+
+    if (exchange && no_replace)
+    {
+        fatx_error(fs, "exchange and no_replace both set\n");
+        return FATX_STATUS_ERROR;
+    }
 
     /* Sanity check that we're not trying to move the file */
     from_dirname = fatx_dirname(from);
     to_dirname = fatx_dirname(to);
     path_dif = strcmp(from_dirname, to_dirname);
-    free(from_dirname);
-    free(to_dirname);
-    if (path_dif)
-    {
-        fatx_error(fs, "rename directories do not match\n");
-        return FATX_STATUS_ERROR;
-    }
-
-    /* Get file attributes. */
-    status = fatx_get_attr(fs, from, &attr);
-    if (status) return status;
 
     /* Check that the new filename is not too long */
     to_basename = fatx_basename(to);
     if (strlen(to_basename) >= FATX_MAX_FILENAME_LEN)
     {
-        free(to_basename);
         fatx_error(fs, "destination name too long\n");
-        return FATX_STATUS_ERROR;
+        status = FATX_STATUS_ERROR;
+        goto done;
     }
 
-    /* Rename the file */
-    strcpy(attr.filename, to_basename);
-    free(to_basename);
+    from_basename = fatx_basename(from);
+    if (strlen(from_basename) >= FATX_MAX_FILENAME_LEN)
+    {
+        fatx_error(fs, "source name too long\n");
+        status = FATX_STATUS_ERROR;
+        goto done;
+    }
 
-    /* Save new attributes */
-    return fatx_set_attr(fs, from, &attr);
+    /* Get source file attributes. */
+    status = fatx_get_attr(fs, from, &attr_from);
+    if (status) goto done;
+
+    /* Get destination file attributes */
+    status = fatx_get_attr(fs, to, &attr_to);
+    if (status == FATX_STATUS_FILE_NOT_FOUND)
+    {
+        /* no_replace does not apply */
+        if (exchange)
+        {
+            fatx_error(fs, "destination does not exist but exchange was set\n");
+            status = FATX_STATUS_ERROR;
+        }
+        else if (path_dif)
+        {
+            status = fatx_mknod(fs, to);
+            if (status) goto done;
+            status = fatx_attr_atomic_swap(fs, from_dirname, from_basename, to_dirname, to_basename);
+            if (status) goto done;
+            status = fatx_unlink(fs, from);
+        }
+        else
+        {
+            /* No file in destination, so rename the first */
+            strcpy(attr_from.filename, to_basename);
+            status = fatx_set_attr(fs, from, &attr_from);
+        }
+    }
+    else if (status == FATX_STATUS_SUCCESS)
+    {
+        if (no_replace)
+        {
+            fatx_error(fs, "destination name already exists and no_replace was set\n");
+            status = FATX_STATUS_ERROR;
+        }
+        else if (exchange)
+        {
+            status = fatx_attr_atomic_swap(fs, from_dirname, from_basename, to_dirname, to_basename);
+        }
+        else if (path_dif)
+        {
+            status = fatx_attr_atomic_swap(fs, from_dirname, from_basename, to_dirname, to_basename);
+            if (status) goto done;
+            status = fatx_unlink(fs, from);
+        }
+        else
+        {
+            /* Replace the file at the destination */
+            status = fatx_unlink(fs, to);
+            if (status) goto done;
+            strcpy(attr_from.filename, to_basename);
+            status = fatx_set_attr(fs, from, &attr_from);
+        }
+    }
+    else
+    {
+        fatx_error(fs, "error getting destination attributes");
+    }
+
+done:
+    free(from_dirname);
+    free(to_dirname);
+    if (to_basename) free(to_basename);
+    if (from_basename) free(from_basename);
+    return status;
 }

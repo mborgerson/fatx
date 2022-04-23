@@ -68,7 +68,7 @@ int fatx_attr_to_dirent(struct fatx_fs *fs, struct fatx_attr *attr, struct fatx_
 /*
  * Get attributes.
  */
-int fatx_get_attr_dir(struct fatx_fs *fs, char const *path, char const *start, struct fatx_dir *dir, struct fatx_dirent *dirent, struct fatx_attr *attr)
+int fatx_get_attr_dir(struct fatx_fs *fs, char const *start, struct fatx_dir *dir, struct fatx_dirent *dirent, struct fatx_attr *attr)
 {
     struct fatx_dirent *nextdirent;
     int status;
@@ -125,7 +125,7 @@ int fatx_get_attr(struct fatx_fs *fs, const char *path, struct fatx_attr *attr)
     if (status) return status;
 
     path_basename = fatx_basename(path);
-    status = fatx_get_attr_dir(fs, path, path_basename, &dir, &dirent, attr);
+    status = fatx_get_attr_dir(fs, path_basename, &dir, &dirent, attr);
     free(path_basename);
 
     fatx_close_dir(fs, &dir);
@@ -151,7 +151,7 @@ int fatx_set_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr)
     if (status) return status;
 
     path_basename = fatx_basename(path);
-    status = fatx_get_attr_dir(fs, path, path_basename, &dir, &dirent, &old_attr);
+    status = fatx_get_attr_dir(fs, path_basename, &dir, &dirent, &old_attr);
     free(path_basename);
     if (status) return status;
 
@@ -159,6 +159,57 @@ int fatx_set_attr(struct fatx_fs *fs, char const *path, struct fatx_attr *attr)
 
     status = fatx_write_dir(fs, &dir, &dirent, attr);
     fatx_close_dir(fs, &dir);
+    return status;
+}
+
+int fatx_attr_atomic_swap(struct fatx_fs *fs, char const *path1, char const *base1, char const *path2, char const *base2)
+{
+    struct fatx_dir dir1, dir2;
+    struct fatx_dirent dirent1, dirent2;
+    struct fatx_attr attr1, attr2;
+    int status;
+
+    fatx_debug(fs, "fatx_attr_atomic_swap(path1=\"%s/%s\", path2=\"%s/%s\")\n", path1, base1, path2, base2);
+
+    status = fatx_open_dir(fs, path1, &dir1);
+    if (status) return status;
+
+    status = fatx_open_dir(fs, path2, &dir2);
+    if (status) goto done;
+
+    status = fatx_get_attr_dir(fs, base1, &dir1, &dirent1, &attr1);
+    if (status) goto done;
+
+    status = fatx_get_attr_dir(fs, base2, &dir2, &dirent2, &attr2);
+    if (status) goto done;
+
+    strcpy(dirent1.filename, base2);
+    strcpy(attr1.filename, base2);
+    strcpy(dirent2.filename, base1);
+    strcpy(attr2.filename, base1);
+
+    status = fatx_write_dir(fs, &dir2, &dirent2, &attr1);
+    if (status) goto done;
+
+    status = fatx_write_dir(fs, &dir1, &dirent1, &attr2);
+    if (status)
+    {
+        int restore_status;
+        /* Restore dirent2 */
+        strcpy(dirent2.filename, base2);
+        strcpy(attr2.filename, base2);
+        restore_status = fatx_write_dir(fs, &dir2, &dirent2, &attr2);
+        if (restore_status)
+        {
+            fatx_error(fs, "atomic swap failed to restore first dirent, ");
+            fatx_error(fs, "path \"%s\" write failed with code %d, ", path1, status);
+            fatx_error(fs, "path \"%s\" restore failed with code %d\n", path2, restore_status);
+        }
+    }
+
+done:
+    fatx_close_dir(fs, &dir1);
+    fatx_close_dir(fs, &dir2);
     return status;
 }
 
