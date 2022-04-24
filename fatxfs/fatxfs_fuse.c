@@ -53,6 +53,7 @@ struct fatx_fuse_private_data {
     struct fatx_fs   *fs;
     char const       *device_path;
     char const       *log_path;
+    char             *mount_point;
     char              mount_partition_drive;
     size_t            mount_partition_offset;
     size_t            mount_partition_size;
@@ -143,10 +144,38 @@ void fatx_fuse_destroy(void *data)
     free(pd->fs);
     pd->fs = NULL;
 
+    free(pd->mount_point);
+
     if (pd->log_handle)
     {
         fclose(pd->log_handle);
     }
+}
+
+void fatx_attr_to_stat(const struct fatx_attr *attr, struct stat *stbuf)
+{
+    struct fuse_context *context;
+    context = fuse_get_context();
+
+    stbuf->st_mode   = 0777;
+    stbuf->st_nlink  = 1;
+    stbuf->st_size   = attr->file_size;
+    stbuf->st_mtime  = fatx_ts_to_time_t(&(attr->modified));
+    stbuf->st_atime  = fatx_ts_to_time_t(&(attr->accessed));
+    stbuf->st_ctime  = fatx_ts_to_time_t(&(attr->created));
+
+    if (attr->attributes & FATX_ATTR_DIRECTORY)
+    {
+        stbuf->st_mode |= S_IFDIR;
+    }
+    else
+    {
+        stbuf->st_mode |= S_IFREG;
+    }
+
+
+    stbuf->st_uid = context->uid;
+    stbuf->st_gid = context->gid;
 }
 
 /*
@@ -158,12 +187,63 @@ int fatx_fuse_read_dir(const char *path, void *buf, fuse_fill_dir_t filler, off_
     struct fatx_dirent dirent, *nextdirent;
     struct fatx_attr attr;
     struct fatx_dir dir;
+    struct stat stat_buf;
+    struct fuse_context *context;
     int status;
 
     pd = fatx_fuse_get_private_data();
     if (pd == NULL) return -1;
 
     fatx_debug(pd->fs, "fatx_fuse_read_dir(path=\"%s\", buf=0x%p, offset=0x%zx)\n", path, buf, offset);
+
+    /* Return record for '.' */
+    memset(&stat_buf, 0, sizeof(stat_buf));
+    if (strcmp(path, "/") != 0)
+    {
+        status = fatx_get_attr(pd->fs, path, &attr);
+        if (status) return status;
+
+        fatx_attr_to_stat(&attr, &stat_buf);
+    }
+    
+    status = filler(buf, ".", &stat_buf, 0);
+    if (status) return -ENOMEM;
+
+    /* Return record for '..' */
+    if (strcmp(path, "/") == 0)
+    {
+        /* On the root path, stat the mount point's parent */
+        char *parent = fatx_dirname(pd->mount_point);
+        status = stat(parent, &stat_buf);
+        free(parent);
+        if (status) return -errno;
+    }
+    else
+    {
+        /* If not the root, stat the fs (or handle the root parent case) */
+        char *parent = fatx_dirname(path);
+        memset(&stat_buf, 0, sizeof(stat_buf));
+        if (strcmp(parent, "/") != 0)
+        {
+            status = fatx_get_attr(pd->fs, parent, &attr);
+            free(parent);
+            if (status) return status;
+
+            fatx_attr_to_stat(&attr, &stat_buf);
+        }
+        else
+        {
+            context = fuse_get_context();
+            stat_buf.st_uid = context->uid;
+            stat_buf.st_gid = context->gid;
+            stat_buf.st_mode = S_IFDIR | 0777;
+            stat_buf.st_nlink = 1;
+            free(parent);
+        }
+    }
+
+    status = filler(buf, "..", &stat_buf, 0);
+    if (status) return -ENOMEM;
 
     /* Open the directory. */
     status = fatx_open_dir(pd->fs, path, &dir);
@@ -177,8 +257,11 @@ int fatx_fuse_read_dir(const char *path, void *buf, fuse_fill_dir_t filler, off_
 
         if (status == FATX_STATUS_SUCCESS)
         {
+            memset(&stat_buf, 0, sizeof(stat_buf));
+            fatx_attr_to_stat(&attr, &stat_buf);
+
             /* Found a directory entry, use the filler function to add it. */
-            status = filler(buf, nextdirent->filename, NULL, 0);
+            status = filler(buf, nextdirent->filename, &stat_buf, 0);
 
             if (status)
             {
@@ -219,6 +302,7 @@ int fatx_fuse_get_attr(const char  *path, struct stat *stbuf)
 {
     struct fatx_fuse_private_data *pd;
     struct fatx_attr attr;
+    struct fuse_context *context;
     int status;
 
     pd = fatx_fuse_get_private_data();
@@ -230,6 +314,10 @@ int fatx_fuse_get_attr(const char  *path, struct stat *stbuf)
 
     if (strcmp(path, "/") == 0)
     {
+
+        context = fuse_get_context();
+        stbuf->st_uid = context->uid;
+        stbuf->st_gid = context->gid;
         stbuf->st_mode = S_IFDIR | 0777;
         stbuf->st_nlink = 1;
         return 0;
@@ -249,21 +337,7 @@ int fatx_fuse_get_attr(const char  *path, struct stat *stbuf)
         return -1;
     }
 
-    stbuf->st_mode   = 0777;
-    stbuf->st_nlink  = 1;
-    stbuf->st_size   = attr.file_size;
-    stbuf->st_mtime  = fatx_ts_to_time_t(&(attr.modified));
-    stbuf->st_atime  = fatx_ts_to_time_t(&(attr.accessed));
-    stbuf->st_ctime  = fatx_ts_to_time_t(&(attr.created));
-
-    if (attr.attributes & FATX_ATTR_DIRECTORY)
-    {
-        stbuf->st_mode |= S_IFDIR;
-    }
-    else
-    {
-        stbuf->st_mode |= S_IFREG;
-    }
+    fatx_attr_to_stat(&attr, stbuf);
 
     return 0;
 }
@@ -460,16 +534,15 @@ int fatx_fuse_rename(const char *from, const char *to)
 int fatx_fuse_utimens(const char *path, const struct timespec ts[2])
 {
     struct fatx_fuse_private_data *pd;
-    struct fatx_ts time[2];
+    struct fatx_ts fat_time[2];
     int status;
 
     pd = fatx_fuse_get_private_data();
     if(pd == NULL) return -1;
 
-    fatx_time_t_to_fatx_ts(ts[0].tv_sec, &(time[0]));
-    fatx_time_t_to_fatx_ts(ts[1].tv_sec, &(time[1]));
-
-    status = fatx_utime(pd->fs, path, time);
+    fatx_time_t_to_fatx_ts(ts[0].tv_sec, &(fat_time[0]));
+    fatx_time_t_to_fatx_ts(ts[1].tv_sec, &(fat_time[1]));
+    status = fatx_utime(pd->fs, path, fat_time);
     return (status == FATX_STATUS_SUCCESS ? 0 : -1);
 }
 
@@ -514,6 +587,14 @@ int fatx_fuse_opt_proc(void *data, const char *arg, int key, struct fuse_args *o
         {
             pd->device_path = arg;
             return 0;
+        }
+        /* Copy second non option arg (mount point) */
+        else if (pd->mount_point == NULL)
+        {
+            pd->mount_point = malloc(strlen(arg)+1);
+            strcpy(pd->mount_point, arg);
+            /* Pass it to FUSE */
+            return 1;
         }
         else
         {
@@ -683,7 +764,7 @@ int main(int argc, char *argv[])
     if (pd.device_path == NULL)
     {
         fprintf(stderr, "please specify device path\n");
-        return -1;
+        goto error_nofs;
     }
 
     if (pd.mount_partition_offset != -1 || pd.mount_partition_size != -1)
@@ -693,19 +774,19 @@ int main(int argc, char *argv[])
         if (pd.mount_partition_drive != 0x00)
         {
             fprintf(stderr, "--drive cannot be used with --offset or --size\n");
-            return -1;
+            goto error_nofs;
         }
 
         if (pd.mount_partition_offset == -1)
         {
             fprintf(stderr, "please specify partition offset\n");
-            return -1;
+            goto error_nofs;
         }
 
         if (pd.mount_partition_size == -1)
         {
             fprintf(stderr, "please specify partition size\n");
-            return -1;
+            goto error_nofs;
         }
     }
     else
@@ -722,7 +803,7 @@ int main(int argc, char *argv[])
         if (status)
         {
             fprintf(stderr, "unknown drive letter '%c'\n", pd.mount_partition_drive);
-            return -1;
+            goto error_nofs;
         }
     }
 
@@ -730,7 +811,7 @@ int main(int argc, char *argv[])
     if (pd.fs == NULL)
     {
         fprintf(stderr, "no memory\n");
-        return -1;
+        goto error_nofs;
     }
 
     /*
@@ -743,7 +824,7 @@ int main(int argc, char *argv[])
         if (pd.log_handle == NULL)
         {
             fprintf(stderr, "failed to open %s for writing\n", pd.log_path);
-            goto error;
+            goto error_fs;
         }
         setbuf(pd.log_handle, NULL);
         fatx_log_init(pd.fs, pd.log_handle, pd.log_level);
@@ -759,13 +840,13 @@ int main(int argc, char *argv[])
         else
         {
             fprintf(stderr, "please specify --destroy-all-existing-data to perform device formatting\n");
-            return -1;
+            goto error_fs;
         }
     }
     else if (pd.format_confirm)
     {
         fprintf(stderr, "--destroy-all-existing-data can only be used with --format\n");
-        return -1;
+        goto error_fs;
     }
 
     /* Open the device */
@@ -778,7 +859,7 @@ int main(int argc, char *argv[])
     if (status)
     {
         fprintf(stderr, "failed to initialize the filesystem\n");
-        goto error;
+        goto error_fs;
     }
 
     /* Force single threaded operation .*/
@@ -786,7 +867,7 @@ int main(int argc, char *argv[])
 
     return fuse_main(args.argc, args.argv, &fatx_fuse_oper, &pd);
 
-error:
+error_fs:
     if (pd.log_handle)
     {
         fclose(pd.log_handle);
@@ -794,5 +875,7 @@ error:
     }
 
     free(pd.fs);
+error_nofs:
+    free(pd.mount_point);
     return -1;
 }

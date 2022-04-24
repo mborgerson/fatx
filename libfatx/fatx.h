@@ -161,7 +161,7 @@ int fatx_mknod(struct fatx_fs *fs, char const *path);
 int fatx_truncate(struct fatx_fs *fs, char const *path, off_t offset);
 int fatx_rename(struct fatx_fs *fs, char const *from, char const *to, bool exchange, bool no_replace);
 void fatx_time_t_to_fatx_ts(const time_t in, struct fatx_ts *out);
-time_t fatx_ts_to_time_t(struct fatx_ts *in);
+time_t fatx_ts_to_time_t(const struct fatx_ts *in);
 
 /* Disk Functions */
 int fatx_disk_size(char const *path, uint64_t *size);
@@ -170,6 +170,10 @@ int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, e
 int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster);
 int fatx_drive_to_offset_size(char drive_letter, uint64_t *offset, uint64_t *size);
 int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint64_t first_power_on);
+
+/* Misc Functions */
+char *fatx_dirname(const char *path);
+char *fatx_basename(const char *path);
 
 #ifdef __cplusplus
 }
