@@ -170,7 +170,5 @@ int fatx_unpack_date(uint16_t in, struct fatx_ts *out);
 int fatx_unpack_time(uint16_t in, struct fatx_ts *out);
 int fatx_pack_date(struct fatx_ts *in, uint16_t *out);
 int fatx_pack_time(struct fatx_ts *in, uint16_t *out);
-char *fatx_dirname(const char *path);
-char *fatx_basename(const char *path);
 
 #endif
