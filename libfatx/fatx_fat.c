@@ -116,7 +116,7 @@ int fatx_flush_fat_cache(struct fatx_fs *fs)
 
     fatx_debug(fs, "fatx_flush_fat_cache()\n");
 
-    if (!cache->data || !cache->dirty || !cache->data)
+    if (!cache->data || !cache->dirty)
     {
         return FATX_STATUS_SUCCESS;
     }
@@ -417,21 +417,25 @@ int fatx_alloc_cluster(struct fatx_fs *fs, size_t *cluster, bool zero)
     int status;
     fatx_fat_entry fat_entry;
     static size_t i = 2;
-    size_t wraparound;
+    size_t start_i;
+    bool wrapped;
     void *zero_buf;
 
     fatx_debug(fs, "fatx_alloc_cluster(zero: %s)\n", zero ? "true" : "false");
 
-    wraparound = i - 1;
+    start_i = i;
+    wrapped = false;
 
     for (; 1; i++)
     {
         if (i >= fs->num_clusters)
         {
             i = 2;
+            wrapped = true;
         }
 
-        if (i == wraparound)
+        /* Check for the case that the FAT was full when mounting initially */
+        if (i == start_i && wrapped)
         {
             fatx_error(fs, "no clusters available to allocate\n");
             return FATX_STATUS_ERROR;
