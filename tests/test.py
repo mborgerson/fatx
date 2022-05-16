@@ -18,6 +18,15 @@ class BasicTest(unittest.TestCase):
 		m.update(d)
 		assert m.hexdigest() == '338e6e203d9f1db5f2c1d976b8969af42049c32e1a65ac0347fbc6efcf5bd7c6'
 
+	def test_read_empty_file(self):
+		fs = Fatx('xbox_hdd.img')
+		empty_file = '/empty'
+		fs.mknod(empty_file)
+
+		res = fs.read(empty_file)
+		fs.unlink(empty_file)
+		assert len(res) == 0
+
 	def test_create_file(self):
 		test_file_path = '/test_file.txt'
 		fs = Fatx('xbox_hdd.img')
