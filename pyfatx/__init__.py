@@ -148,6 +148,9 @@ class Fatx:
 		path = self._sanitize_path(path)
 		attr = self.get_attr(path)
 		assert(attr.is_file)
+		if offset == 0 and attr.file_size == 0:
+			return b''
+
 		assert(offset < attr.file_size)
 		if size is None:
 			size = attr.file_size - offset
@@ -222,6 +225,14 @@ class Fatx:
 		attr = self.get_attr(path)
 		assert attr.is_file
 		s = fatx_truncate(self.fs, path, new_size)
+		assert s == 0
+
+	def mknod(self, path: AnyStr):
+		"""
+		Create a new file
+		"""
+		path = self._sanitize_path(path)
+		s = fatx_mknod(self.fs, path)
 		assert s == 0
 
 	def unlink(self, path: AnyStr):
