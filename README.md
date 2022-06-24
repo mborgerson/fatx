@@ -59,6 +59,7 @@ Finally, start the build:
 ### How to Use
 Firstly, you will need a raw disk image or block device to mount. Then, you can simply create a mountpoint and mount the "C drive" (default behavior). For example:
 
+    $ cd fatxfs
     $ mkdir c_drive
     $ ./fatxfs /dev/nbd0 c_drive
     $ ls c_drive
