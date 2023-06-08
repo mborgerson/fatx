@@ -32,7 +32,7 @@ fatxfs can be easily built inside a [Docker](https://www.docker.com/) container.
 ##### Ubuntu
 Assuming you already have typical build tools installed, install FUSE and CMake:
 
-    $ sudo apt-get install libfuse-dev cmake
+    $ sudo apt-get install libfuse-dev cmake pkg-config
 
 ##### macOS
 Download Xcode (available from the App Store) to get command line tools.
