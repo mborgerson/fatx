@@ -140,7 +140,7 @@ int fatx_read(struct fatx_fs *fs, char const *path, off_t offset, size_t size, v
             break;
         }
 
-        bytes_to_read = MIN(fs->bytes_per_cluster, size-total_bytes_read);
+        bytes_to_read = MIN(fs->bytes_per_cluster - cluster_offset, size-total_bytes_read);
         bytes_to_read = MIN(bytes_to_read, bytes_remaining_in_file);
 
         if (bytes_to_read == 0)
