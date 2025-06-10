@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -qy \
         build-essential pkg-config libfuse-dev cmake
@@ -9,7 +9,7 @@ RUN mkdir build \
  && cmake .. \
  && make DESTDIR=/fatx install
 
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -qy fuse
 COPY --from=0 /fatx /fatx
