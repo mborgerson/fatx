@@ -1,6 +1,6 @@
 [package]
 name = "fatx-fuse"
-version = "0.1.0"
+version = "0.2.0-dev"
 edition = "2024"
 authors = ["Matt Borgerson <contact@mborgerson.com>"]
 description = "FUSE driver for the Original Xbox FATX Filesystem"
@@ -10,7 +10,7 @@ keywords = ["xbox", "filesystem", "fatx", "fuse"]
 readme = "README.md"
 
 [dependencies]
-fatx = { path = "../fatx", version = "0.1.0" }
+fatx = { path = "../fatx", version = "0.2.0-dev" }
 clap = { version = "4", features = ["derive"] }
 log = "0.4"
 env_logger = "0.10"
