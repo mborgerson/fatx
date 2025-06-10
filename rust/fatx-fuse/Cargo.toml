@@ -1,0 +1,20 @@
+[package]
+name = "fatx-fuse"
+version = "0.1.0"
+edition = "2024"
+authors = ["Matt Borgerson <contact@mborgerson.com>"]
+description = "FUSE driver for the Original Xbox FATX Filesystem"
+license = "GPL-2.0"
+repository = "https://github.com/mborgerson/fatx"
+keywords = ["xbox", "filesystem", "fatx", "fuse"]
+readme = "README.md"
+
+[dependencies]
+fatx = { path = "../fatx", version = "0.1.0" }
+clap = { version = "4", features = ["derive"] }
+log = "0.4"
+env_logger = "0.10"
+fuser = "0.15.1"
+libc = "0.2.172"
+bimap = "0.6.3"
+chrono = "0.4.41"

@@ -1,0 +1,17 @@
+[package]
+name = "fatx"
+version = "0.1.0"
+edition = "2024"
+authors = ["Matt Borgerson <contact@mborgerson.com>"]
+description = "Original Xbox FATX Filesystem Library"
+license = "GPL-2.0"
+repository = "https://github.com/mborgerson/fatx"
+keywords = ["xbox", "filesystem", "fatx"]
+readme = "README.md"
+
+[dependencies]
+zerocopy = { version = "0.8.25", features = ["std", "derive"] }
+zerocopy-derive = "0.8.25"
+log = "0.4"
+env_logger = "0.10"
+thiserror = "2.0.12"
