@@ -19,12 +19,6 @@ jobs:
     steps:
     - name: Clone
       uses: actions/checkout@v4
-    - name: Cache Qt
-      id: cache-qt
-      uses: actions/cache@v4
-      with:
-        path: ../Qt
-        key: ${{ runner.os }}-QtCache
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
       with:
