@@ -8,10 +8,6 @@ Original Xbox FATX Filesystem Library, Python bindings, FUSE driver, and GUI exp
 * [**pyfatx**](#pyfatx) is a Python module providing bindings to libfatx.
 * [**gfatx**](#gfatx) is a graphical utility for working with FATX disk images, built around libfatx.
 
-libfatx
--------
-**libfatx** provides both read and write access to FATX filesystems, and formatting disks. Large disks are supported via F partition.
-
 License
 -------
 See LICENSE.txt
