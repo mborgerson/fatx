@@ -39,7 +39,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy \
-            build-essential pkg-config libfuse-dev cmake git qt5-default
+            build-essential pkg-config libfuse-dev cmake git qt6-base-dev qt6-tools-dev qt6-tools-dev-tools
       - name: Build
         run: |
           mkdir build
@@ -78,13 +78,13 @@ jobs:
         run: |
           export HOMEBREW_NO_AUTO_UPDATE=1
           export HOMEBREW_NO_INSTALL_CLEANUP=1
-          brew install pkgconfig cmake macfuse qt@5
+          brew install pkgconfig cmake macfuse qt@6
       - name: Build
         run: |
-          export PATH="/usr/local/opt/qt@5/bin:$PATH"
-          export LDFLAGS="-L/usr/local/opt/qt@5/lib"
-          export CPPFLAGS="-I/usr/local/opt/qt@5/include"
-          export PKG_CONFIG_PATH="/usr/local/opt/qt@5/lib/pkgconfig"
+          export PATH="/usr/local/opt/qt@6/bin:$PATH"
+          export LDFLAGS="-L/usr/local/opt/qt@6/lib"
+          export CPPFLAGS="-I/usr/local/opt/qt@6/include"
+          export PKG_CONFIG_PATH="/usr/local/opt/qt@6/lib/pkgconfig"
 
           mkdir build
           cd build

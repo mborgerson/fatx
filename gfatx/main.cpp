@@ -2,12 +2,13 @@
 #include <cstdio>
 
 #include <QApplication>
-#include <QDesktopWidget>
 #include <QFileSystemModel>
 #include <QFileIconProvider>
 #include <QTreeView>
 #include <QCommandLineParser>
 #include <QCommandLineOption>
+#include <QScreen>
+#include <QGuiApplication>
 
 #include "fatxfilesystemmodel.h"
 
@@ -69,8 +70,15 @@ int main(int argc, char *argv[])
     tree.setAnimated(false);
     tree.setIndentation(20);
     tree.setSortingEnabled(true);
-    const QSize availableSize = QApplication::desktop()->availableGeometry(&tree).size();
-    tree.resize(availableSize / 2);
+    QScreen *screen = QGuiApplication::screenAt(tree.pos());
+    if (!screen) {
+        screen = QGuiApplication::primaryScreen();
+    }
+    if (screen) {
+        const QSize availableSize = screen->availableGeometry().size();
+        tree.resize(availableSize / 2);
+    }
+
     tree.setColumnWidth(0, tree.width() / 3);
 
     tree.setWindowTitle(QObject::tr("gfatx"));
