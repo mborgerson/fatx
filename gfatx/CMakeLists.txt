@@ -11,9 +11,9 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt5 COMPONENTS Widgets)
-if(Qt5_FOUND)
-    find_package(Qt5 COMPONENTS Widgets REQUIRED)
+find_package(Qt6 COMPONENTS Widgets)
+if(Qt6_FOUND)
+    find_package(Qt6 COMPONENTS Widgets REQUIRED)
     add_executable(gfatx
       main.cpp
       mainwindow.cpp
@@ -23,6 +23,6 @@ if(Qt5_FOUND)
       fatxfilesystemmodel.h
     )
 
-    target_link_libraries(gfatx PRIVATE Qt5::Widgets fatx)
+    target_link_libraries(gfatx PRIVATE Qt6::Widgets fatx)
     target_include_directories(gfatx PUBLIC ${CMAKE_SOURCE_DIR}/libfatx)
 endif()
