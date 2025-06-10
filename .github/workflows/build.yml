@@ -6,11 +6,13 @@ on:
       - '.github/**'
       - '!.github/workflows/**'
       - 'README.md'
+      - 'rust/**'
   pull_request:
     paths-ignore:
       - '.github/**'
       - '!.github/workflows/**'
       - 'README.md'
+      - 'rust/**'
 
 jobs:
   BuildWindows:
