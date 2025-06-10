@@ -8,6 +8,10 @@ Original Xbox FATX Filesystem Library, Python bindings, FUSE driver, and GUI exp
 * [**pyfatx**](pyfatx/README.md) is a Python module providing bindings to libfatx.
 * [**gfatx**](gfatx/README.md) is a graphical utility for working with FATX disk images, built around libfatx.
 
+There is work-in-progress towards a Rust implementation:
+* [**fatx**](rust/fatx/README.md) is a Rust crate for working with the FATX filesystem, like libfatx.
+* [**fatx-fuse**](rust/fatx-fuse/README.md) is a Rust crate providing a FUSE driver based on fuser and fatx.
+
 License
 -------
 See LICENSE.txt
