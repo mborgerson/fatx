@@ -53,7 +53,10 @@ jobs:
       - name: Test Python bindings
         run: |
           rm -rf build
-          pip install --user .
+          mkdir venv
+          python -m venv venv
+          source venv/bin/activate
+          pip install .
           cd tests
           python test.py
   BuildDocker:
@@ -93,7 +96,10 @@ jobs:
       - name: Test Python bindings
         run: |
           rm -rf build
-          pip3 install --user .
+          mkdir venv
+          python -m venv venv
+          source venv/bin/activate
+          pip install .
           cd tests
           tar xvf xbox_hdd.img.tgz
           python3 test.py
