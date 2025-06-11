@@ -138,10 +138,11 @@ jobs:
           cmake -Bbuild -S. -DCMAKE_PREFIX_PATH=$PWD/../install
           cmake --build build --parallel --verbose --target install
           popd
-      - name: Test fatxfs
-        run: |
-          pushd fatxfs
-          ./test.sh
+      # XXX: Can't install extension to run macfuse on GH actions apparently. This will hang.
+      # - name: Test fatxfs
+      #   run: |
+      #     pushd fatxfs
+      #     ./test.sh
       - name: Test pyfatx
         run: |
           pushd pyfatx
