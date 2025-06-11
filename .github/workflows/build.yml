@@ -74,7 +74,6 @@ jobs:
           popd
       - name: Test fatxfs
         run: |
-          cp tests/xbox_hdd.img.tgz fatxfs
           pushd fatxfs
           ./test.sh
       - name: Test pyfatx
@@ -87,7 +86,6 @@ jobs:
 
           pip install .
           cd tests
-          tar xvf ../../tests/xbox_hdd.img.tgz
           python test.py
 
   BuildDocker:
@@ -100,7 +98,6 @@ jobs:
         run: docker build -t fatx .
       - name: Test
         run: |
-          cp tests/xbox_hdd.img.tgz fatxfs
           docker run --rm -v $PWD/fatxfs:/work -w /work \
             --device /dev/fuse --privileged fatx ./test.sh
 
@@ -156,7 +153,6 @@ jobs:
 
           pip install .
           cd tests
-          tar xvf ../../tests/xbox_hdd.img.tgz
           python test.py
 
   build_sdist:
