@@ -5,7 +5,7 @@ A graphical utility for working with FATX disk images, built around libfatx.
 
 Note: This tool is in a very early state, and only has the functionality to browse filesystems in a disk at the moment.
 
-![gfatx](screenshots/gfatx.png)
+![gfatx](gfatx.png)
 
 ## Build on Ubuntu
 ```
