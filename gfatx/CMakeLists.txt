@@ -1,6 +1,8 @@
-# cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.5)
 
-# project(gfatx LANGUAGES CXX)
+project(gfatx LANGUAGES CXX)
+
+find_package(libfatx REQUIRED)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -23,6 +25,5 @@ if(Qt6_FOUND)
       fatxfilesystemmodel.h
     )
 
-    target_link_libraries(gfatx PRIVATE Qt6::Widgets fatx)
-    target_include_directories(gfatx PUBLIC ${CMAKE_SOURCE_DIR}/libfatx)
+    target_link_libraries(gfatx PRIVATE Qt6::Widgets libfatx::fatx)
 endif()
