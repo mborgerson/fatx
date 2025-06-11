@@ -33,6 +33,11 @@ jobs:
       run: |
         sudo apt-get install fuse3 libfuse3-dev
 
+    - name: Update rust toolchain
+      run: |
+        rustup update
+        rustup show
+
     - name: Build
       run: |
         cd rust
