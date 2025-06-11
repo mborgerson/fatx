@@ -8,10 +8,6 @@ The latest release of pyfatx can be installed via:
 
     pip install pyfatx
 
-You can install the latest version from source with:
-
-    pip install git+https://github.com/mborgerson/fatx
-
 pyfatx provides a module with some helpful utilities, like listing drive contents and extracting a filesystem, e.g. a filesystem can be extracted with:
 
     python -m pyfatx -x ./path/to/disk.img
