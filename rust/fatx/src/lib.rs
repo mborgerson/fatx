@@ -7,9 +7,9 @@ pub mod fs;
 pub mod partition;
 pub mod path;
 
+pub use datetime::DateTime;
 pub use dir::DirectoryEntry;
 pub use error::Error;
 pub use file::File;
-pub use fs::{FatxFsConfig as FatxFsConfig, FatxFs, FatxFsHandle};
+pub use fs::{FatxFs, FatxFsConfig, FatxFsHandle};
 pub use partition::{DEFAULT_PARTITION_LAYOUT, PartitionMapEntry};
-pub use datetime::DateTime;

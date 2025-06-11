@@ -35,3 +35,13 @@ jobs:
       run: |
         cd rust
         cargo build --release
+
+    - name: Check formatting
+      run: |
+        cd rust
+        cargo fmt -- --check
+
+    - name: Check lints
+      run: |
+        cd rust
+        cargo clippy -- -D warnings

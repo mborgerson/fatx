@@ -34,6 +34,8 @@ pub const DEFAULT_PARTITION_LAYOUT: &[PartitionMapEntry] = &[
 
 impl PartitionMapEntry {
     pub fn from_letter(letter: &str) -> Option<&PartitionMapEntry> {
-        DEFAULT_PARTITION_LAYOUT.iter().find(|&entry| entry.letter == letter)
+        DEFAULT_PARTITION_LAYOUT
+            .iter()
+            .find(|&entry| entry.letter == letter)
     }
 }

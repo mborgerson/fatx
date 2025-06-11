@@ -2,12 +2,12 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::{Arc, Mutex, Weak};
 
+use crate::PartitionMapEntry;
 use crate::dir::{DirectoryEntry, DirectoryEntryIntoIterator};
 use crate::error::Error;
 use crate::fat::{ClusterId, Fat};
 use crate::file::File;
 use crate::partition::DEFAULT_PARTITION_LAYOUT;
-use crate::PartitionMapEntry;
 
 use zerocopy::byteorder::little_endian::{U16, U32};
 use zerocopy::*;
@@ -60,12 +60,13 @@ impl FatxFsConfig {
             device_path,
             partition_offset_bytes,
             partition_size_bytes,
-            num_bytes_per_sector: 512
+            num_bytes_per_sector: 512,
         }
     }
 
     pub fn drive_letter(mut self, letter: &str) -> Self {
-        let partition_info = PartitionMapEntry::from_letter(letter).expect("invalid partition letter");
+        let partition_info =
+            PartitionMapEntry::from_letter(letter).expect("invalid partition letter");
         self.partition_offset_bytes = partition_info.offset_bytes;
         self.partition_size_bytes = partition_info.size_bytes;
         self
@@ -117,9 +118,10 @@ impl FatxFs {
 
         // Cluster geometry cont'd
         let cluster_offset_bytes = fat_offset_bytes + fat.fat_size_bytes;
-        let num_clusters = ((config.partition_size_bytes - fat.fat_size_bytes - FATX_FAT_OFFSET_BYTES)
-            / num_bytes_per_cluster
-            + FATX_FAT_RESERVED_ENTRIES_COUNT as u64) as u32;
+        let num_clusters =
+            ((config.partition_size_bytes - fat.fat_size_bytes - FATX_FAT_OFFSET_BYTES)
+                / num_bytes_per_cluster
+                + FATX_FAT_RESERVED_ENTRIES_COUNT as u64) as u32;
 
         let fs = Arc::new_cyclic(move |weak_self| {
             Mutex::new(FatxFs {
@@ -186,7 +188,10 @@ impl FatxFs {
         if !dirent.is_directory() {
             return Err(Error::NotADirectory);
         }
-        Ok(DirectoryEntryIntoIterator::new(self.handle(), dirent.first_cluster()))
+        Ok(DirectoryEntryIntoIterator::new(
+            self.handle(),
+            dirent.first_cluster(),
+        ))
     }
 }
 
