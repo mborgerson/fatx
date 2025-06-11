@@ -60,7 +60,7 @@ struct FuseFatxFs {
 fn fatx_datetime_to_systemtime(datetime: fatx::DateTime) -> SystemTime {
     if let Some(date) = NaiveDate::from_ymd_opt(
         datetime.year().into(),
-        (datetime.month() + 1).into(),
+        datetime.month().into(),
         datetime.day().into(),
     ) {
         if let Some(datetime) = date.and_hms_opt(
