@@ -80,11 +80,11 @@ impl FatxFs {
         }
 
         // Open device
-        let mut device_handle = std::fs::File::open(&config.device_path).unwrap();
+        let mut device_handle = std::fs::File::open(&config.device_path)?;
         device_handle.seek(SeekFrom::Start(config.partition_offset_bytes))?;
 
         // Read superblock
-        let superblock = Superblock::read_from_io(&mut device_handle).unwrap();
+        let superblock = Superblock::read_from_io(&mut device_handle)?;
         if superblock.signature != FATX_SIGNATURE {
             return Err(Error::InvalidFilesystemSignature);
         }
@@ -161,7 +161,7 @@ impl FatxFs {
         offset_in_cluster: u64,
     ) -> Result<(), Error> {
         self.device_handle.seek(SeekFrom::Start(
-            self.cluster_to_byte_offset(cluster).unwrap() + offset_in_cluster,
+            self.cluster_to_byte_offset(cluster)? + offset_in_cluster,
         ))?;
         Ok(())
     }

@@ -225,15 +225,19 @@ impl DirectoryEntryIterator {
         ) {
             return Some(Err(seek_error));
         }
-        let entry = DirectoryEntry::read_from_io(&mut fs.device_handle).unwrap();
 
-        // FIXME: Entry could be invalid
-
-        if entry.kind() == DirectoryEntryKind::EndOfDirectory {
-            self.finished = true;
+        match DirectoryEntry::read_from_io(&mut fs.device_handle) {
+            Err(err) => {
+                self.finished = true;
+                Some(Err(err.into()))
+            }
+            Ok(entry) => {
+                if entry.kind() == DirectoryEntryKind::EndOfDirectory {
+                    self.finished = true;
+                }
+                Some(Ok(entry))
+            }
         }
-
-        Some(Ok(entry))
     }
 }
 
