@@ -101,7 +101,7 @@ struct fatx_dir {
 
 struct fatx_ts {
     uint16_t year;
-    uint8_t  month;
+    uint8_t  month; // 1 = January
     uint8_t  day;
     uint8_t  hour;
     uint8_t  minute;
