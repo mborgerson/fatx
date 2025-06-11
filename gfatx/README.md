@@ -5,12 +5,14 @@ A graphical utility for working with FATX disk images, built around libfatx.
 
 Note: This tool is in a very early state, and only has the functionality to browse filesystems in a disk at the moment.
 
+Note: You'll need to build and install libfatx first.
+
 ![gfatx](gfatx.png)
 
 ## Build on Ubuntu
 ```
 sudo apt install build-essential pkg-config cmake git qt6-base-dev qt6-tools-dev qt6-tools-dev-tools
-cd /path/to/fatx
+cd /path/to/fatx/gfatx
 mkdir build
 cd build
 cmake ..
@@ -24,7 +26,7 @@ make gfatx
 
 ```
 "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat" amd64
-cd C:\path\to\fatx
+cd C:\path\to\fatx\gfatx
 mkdir build
 cd build
 cmake ..
@@ -38,7 +40,7 @@ export PATH="/usr/local/opt/qt@6/bin:$PATH"
 export LDFLAGS="-L/usr/local/opt/qt@6/lib"
 export CPPFLAGS="-I/usr/local/opt/qt@6/include"
 export PKG_CONFIG_PATH="/usr/local/opt/qt@6/lib/pkgconfig"
-cd /path/to/fatx
+cd /path/to/fatx/gfatx
 mkdir build
 cd build
 cmake --build . --target gfatx
