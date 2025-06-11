@@ -12,7 +12,7 @@ pub struct File {
 }
 
 impl File {
-    pub fn new(handle: FatxFsHandle, dirent: DirectoryEntry) -> Self {
+    pub(crate) fn new(handle: FatxFsHandle, dirent: DirectoryEntry) -> Self {
         Self {
             handle,
             dirent,

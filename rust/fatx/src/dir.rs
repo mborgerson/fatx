@@ -48,7 +48,7 @@ pub enum DirectoryEntryKind {
 }
 
 impl DirectoryEntry {
-    pub fn from_path<P: AsRef<Path>>(fs: &mut FatxFs, path: P) -> Result<Self, Error> {
+    pub(crate) fn from_path<P: AsRef<Path>>(fs: &mut FatxFs, path: P) -> Result<Self, Error> {
         let path = normalize_virtual_path(path);
         let num_components = path.components().count();
 

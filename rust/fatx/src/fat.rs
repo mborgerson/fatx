@@ -4,13 +4,13 @@ use zerocopy::*;
 use crate::error::Error;
 
 #[derive(Debug)]
-pub enum FatType {
+enum FatType {
     Type16,
     Type32,
 }
 
 #[derive(Debug)]
-pub enum FatEntry {
+pub(crate) enum FatEntry {
     Available,
     Reserved,
     Bad,
@@ -20,8 +20,8 @@ pub enum FatEntry {
     Invalid,
 }
 
-pub type FatEntryId = u32;
-pub type ClusterId = u32;
+pub(crate) type FatEntryId = u32;
+pub(crate) type ClusterId = u32;
 
 impl From<u16> for FatEntry {
     fn from(value: u16) -> Self {
@@ -52,14 +52,14 @@ impl From<u32> for FatEntry {
 }
 
 #[derive(Debug)]
-pub struct Fat {
-    pub fat_type: FatType,
-    pub fat_size_bytes: u64,
-    pub fat_data: Vec<u8>, // FIXME: Smarter cache
+pub(crate) struct Fat {
+    fat_type: FatType,
+    pub(crate) fat_size_bytes: u64,
+    pub(crate) fat_data: Vec<u8>, // FIXME: Smarter cache
 }
 
 impl Fat {
-    pub fn new(num_fat_entries: u32) -> Self {
+    pub(crate) fn new(num_fat_entries: u32) -> Self {
         // NOTE: this *MUST* be kept below the Cluster Reserved marker for FAT16
         let (fat_type, fat_size_bytes) = if num_fat_entries < 0xfff0 {
             (
@@ -82,7 +82,7 @@ impl Fat {
         }
     }
 
-    pub fn entry(&mut self, index: FatEntryId) -> Result<FatEntry, Error> {
+    pub(crate) fn entry(&mut self, index: FatEntryId) -> Result<FatEntry, Error> {
         match self.fat_type {
             FatType::Type16 => {
                 let fat = <[U16]>::ref_from_bytes_with_elems(

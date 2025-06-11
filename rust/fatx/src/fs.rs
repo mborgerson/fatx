@@ -147,7 +147,7 @@ impl FatxFs {
         }
     }
 
-    pub fn cluster_to_byte_offset(&self, cluster: ClusterId) -> Result<u64, Error> {
+    pub(crate) fn cluster_to_byte_offset(&self, cluster: ClusterId) -> Result<u64, Error> {
         if cluster >= self.num_clusters + FATX_FAT_RESERVED_ENTRIES_COUNT {
             return Err(Error::InvalidClusterNumber);
         }
@@ -159,7 +159,7 @@ impl FatxFs {
         Ok(byte_offset)
     }
 
-    pub fn seek_cluster(
+    pub(crate) fn seek_cluster(
         &mut self,
         cluster: ClusterId,
         offset_in_cluster: u64,
@@ -170,11 +170,11 @@ impl FatxFs {
         Ok(())
     }
 
-    pub fn stat<P: AsRef<Path>>(&mut self, path: P) -> Result<DirectoryEntry, Error> {
+    pub(crate) fn stat<P: AsRef<Path>>(&mut self, path: P) -> Result<DirectoryEntry, Error> {
         DirectoryEntry::from_path(self, path)
     }
 
-    pub fn open<P: AsRef<Path>>(&mut self, path: P) -> Result<File, Error> {
+    pub(crate) fn open<P: AsRef<Path>>(&mut self, path: P) -> Result<File, Error> {
         let dirent = self.stat(path)?;
         if dirent.is_file() {
             Ok(File::new(self.handle(), dirent))
@@ -183,7 +183,7 @@ impl FatxFs {
         }
     }
 
-    pub fn read_dir(&mut self, path: &str) -> Result<DirectoryEntryIntoIterator, Error> {
+    pub(crate) fn read_dir(&mut self, path: &str) -> Result<DirectoryEntryIntoIterator, Error> {
         let dirent = DirectoryEntry::from_path(self, path)?;
         if !dirent.is_directory() {
             return Err(Error::NotADirectory);
@@ -196,11 +196,11 @@ impl FatxFs {
 }
 
 pub struct FatxFsHandle {
-    pub fs: Arc<Mutex<FatxFs>>, // FIXME: Make private
+    pub(crate) fs: Arc<Mutex<FatxFs>>, // FIXME: Make private
 }
 
 impl FatxFsHandle {
-    pub fn with_lock<F, T>(&self, f: F) -> T
+    pub(crate) fn with_lock<F, T>(&self, f: F) -> T
     where
         F: FnOnce(&mut FatxFs) -> T,
     {
