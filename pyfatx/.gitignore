@@ -1,1 +1,6 @@
 libfatx/**
+build/
+__pycache__/
+*.so
+*.egg-info
+dist/
