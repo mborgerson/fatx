@@ -26,4 +26,5 @@ if(Qt6_FOUND)
     )
 
     target_link_libraries(gfatx PRIVATE Qt6::Widgets libfatx::fatx)
+    install(TARGETS gfatx DESTINATION bin)
 endif()
