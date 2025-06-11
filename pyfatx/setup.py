@@ -10,11 +10,22 @@ from build_cffi import FfiPreBuildExtension
 __version__ = '0.0.7'
 
 
+def ensure_libfatx_sources():
+    dst_dir = os.path.join(os.path.dirname(__file__), "libfatx")
+    if not os.path.exists(dst_dir):
+        parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "libfatx"))
+        shutil.copytree(parent_dir, dst_dir, dirs_exist_ok=True)
+
+
 class CustomSDist(_sdist):
     def run(self):
-        parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "libfatx"))
-        dst_dir = os.path.join(os.path.dirname(__file__), "libfatx")
-        shutil.copytree(parent_dir, dst_dir, dirs_exist_ok=True)
+        ensure_libfatx_sources()
+        super().run()
+
+
+class CustomBuildPy(_build_py):
+    def run(self):
+        ensure_libfatx_sources()
         super().run()
 
 
@@ -31,6 +42,7 @@ setup(name='pyfatx',
     python_requires='>=3.8',
     cmdclass={
         'sdist': CustomSDist,
+        'build_py': CustomBuildPy,
         'build_ext': FfiPreBuildExtension,
     },
     )
