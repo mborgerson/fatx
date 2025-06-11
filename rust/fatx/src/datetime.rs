@@ -1,6 +1,7 @@
 const FATX_EPOCH: u16 = 2000;
 pub struct Date {
     year: u16,
+    /// 1 = January
     month: u8,
     day: u8,
 }
@@ -17,6 +18,7 @@ impl Date {
     pub fn year(&self) -> u16 {
         self.year
     }
+    /// Returns the month, where 1 = January
     pub fn month(&self) -> u8 {
         self.month
     }
@@ -67,6 +69,7 @@ impl DateTime {
     pub fn year(&self) -> u16 {
         self.date.year
     }
+    /// Returns the month, where 1 = January
     pub fn month(&self) -> u8 {
         self.date.month
     }
