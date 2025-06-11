@@ -138,11 +138,10 @@ jobs:
           cmake -Bbuild -S. -DCMAKE_PREFIX_PATH=$PWD/../install
           cmake --build build --parallel --verbose --target fatxfs
           popd
-      # XXX: Crashes
-      # - name: Test fatxfs
-      #   run: |
-      #     pushd fatxfs
-      #     ./test.sh
+      - name: Test fatxfs
+        run: |
+          pushd fatxfs
+          ./test.sh
       - name: Test pyfatx
         run: |
           pushd pyfatx
