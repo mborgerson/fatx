@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os.path
+import shutil
 import struct
 import subprocess
 import platform
@@ -15,27 +16,37 @@ if platform.system() == 'Windows':
 else:
     LIBRARY_DIR = BUILD_DIR
 
-class FfiPreBuildExtension(build_ext):
-    def pre_run(self, ext, ffi):
-        try:
-            out = subprocess.check_output(['cmake', '--version'])
-        except OSError:
-            raise RuntimeError('Please install CMake to build')
 
-        cmake_config_args = [
-            '-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON',
-            ]
-        cmake_build_args = []
-        if platform.system() == 'Windows':
-            is_64b = (struct.calcsize("P")*8 == 64)
-            cmake_config_args += ['-A', 'x64' if is_64b else 'Win32']
-            cmake_build_args += ['--config', 'Release']
+def ensure_libfatx_sources():
+    dst_dir = os.path.join(os.path.dirname(__file__), "libfatx")
+    if not os.path.exists(dst_dir):
+        parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "libfatx"))
+        shutil.copytree(parent_dir, dst_dir, dirs_exist_ok=True)
 
-        subprocess.check_call(['cmake', '-B', 'build', '-S', 'libfatx'] + cmake_config_args, cwd=ROOT_DIR)
-        subprocess.check_call(['cmake', '--build', 'build', '--parallel', '--verbose', '--target', 'fatx'] + cmake_build_args, cwd=ROOT_DIR)
 
+def build_libfatx():
+    ensure_libfatx_sources()
+
+    try:
+        out = subprocess.check_output(['cmake', '--version'])
+    except OSError:
+        raise RuntimeError('Please install CMake to build')
+
+    cmake_config_args = [
+        '-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON',
+        ]
+    cmake_build_args = []
+    if platform.system() == 'Windows':
+        is_64b = (struct.calcsize("P")*8 == 64)
+        cmake_config_args += ['-A', 'x64' if is_64b else 'Win32']
+        cmake_build_args += ['--config', 'Release']
+
+    subprocess.check_call(['cmake', '-B', 'build', '-S', 'libfatx'] + cmake_config_args, cwd=ROOT_DIR)
+    subprocess.check_call(['cmake', '--build', 'build', '--parallel', '--verbose', '--target', 'fatx'] + cmake_build_args, cwd=ROOT_DIR)
 
 def ffibuilder():
+    build_libfatx()
+
     from cffi import FFI
     ffi = FFI()
     ffi.set_source("pyfatx.libfatx",

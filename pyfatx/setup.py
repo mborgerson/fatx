@@ -4,10 +4,6 @@ import shutil
 from setuptools import setup
 from setuptools.command.build_py import build_py as _build_py
 from setuptools.command.sdist import sdist as _sdist
-from build_cffi import FfiPreBuildExtension
-
-
-__version__ = '0.0.7'
 
 
 def ensure_libfatx_sources():
@@ -23,26 +19,10 @@ class CustomSDist(_sdist):
         super().run()
 
 
-class CustomBuildPy(_build_py):
-    def run(self):
-        ensure_libfatx_sources()
-        super().run()
-
-
-setup(name='pyfatx',
-    version=__version__,
-    description='FATX Filesystem Utils',
-    author='Matt Borgerson',
-    author_email='contact@mborgerson.com',
-    url='https://github.com/mborgerson/fatx',
-    packages=['pyfatx'],
+setup(
     setup_requires=['cffi'],
-    install_requires=['cffi'],
     cffi_modules=['build_cffi.py:ffibuilder'],
-    python_requires='>=3.8',
     cmdclass={
         'sdist': CustomSDist,
-        'build_py': CustomBuildPy,
-        'build_ext': FfiPreBuildExtension,
     },
-    )
+)
