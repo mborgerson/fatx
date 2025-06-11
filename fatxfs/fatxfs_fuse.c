@@ -19,8 +19,8 @@
 
 #define _XOPEN_SOURCE 600
 
-#include "fatx.h"
-#include "fatx_version.h"
+#include <fatx.h>
+#include <fatx_version.h>
 
 #include <errno.h>
 #include <stdlib.h>

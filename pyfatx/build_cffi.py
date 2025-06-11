@@ -31,7 +31,7 @@ class FfiPreBuildExtension(build_ext):
             cmake_config_args += ['-A', 'x64' if is_64b else 'Win32']
             cmake_build_args += ['--config', 'Release']
 
-        subprocess.check_call(['cmake', '-B', 'build'] + cmake_config_args, cwd=ROOT_DIR)
+        subprocess.check_call(['cmake', '-B', 'build', '-S', 'libfatx'] + cmake_config_args, cwd=ROOT_DIR)
         subprocess.check_call(['cmake', '--build', 'build', '--parallel', '--verbose', '--target', 'fatx'] + cmake_build_args, cwd=ROOT_DIR)
 
 
