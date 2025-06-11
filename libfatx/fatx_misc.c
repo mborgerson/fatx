@@ -180,7 +180,7 @@ void fatx_time_t_to_fatx_ts(const time_t in, struct fatx_ts *out)
     out->minute = t->tm_min;
     out->hour   = t->tm_hour;
     out->day    = t->tm_mday;
-    out->month  = t->tm_mon;
+    out->month  = t->tm_mon + 1;
     out->year   = t->tm_year+1900;
 }
 
@@ -192,7 +192,7 @@ time_t fatx_ts_to_time_t(const struct fatx_ts *in)
     t.tm_min  = in->minute;
     t.tm_hour = in->hour;
     t.tm_mday = in->day;
-    t.tm_mon  = in->month;
+    t.tm_mon  = in->month - 1;
     t.tm_year = in->year-1900;
 
     return mktime(&t);
