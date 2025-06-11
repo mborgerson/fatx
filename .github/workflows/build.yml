@@ -25,11 +25,21 @@ jobs:
       uses: jurplel/install-qt-action@v4
       with:
         setup-python: false
-    - name: Build
+    - name: Build libfatx
+      shell: bash
       run: |
-        mkdir build
-        cmake -B build
+        pushd libfatx
+        cmake -Bbuild -S. -DCMAKE_INSTALL_PREFIX=$PWD/../install
+        cmake --build build --parallel --verbose --target install
+        popd
+    - name: Build gfatx
+      shell: bash
+      run: |
+        pushd gfatx
+        cmake -Bbuild -S. -DCMAKE_PREFIX_PATH=$PWD/../install
         cmake --build build --parallel --verbose --target gfatx
+        popd
+
   BuildUbuntu:
     name: Build on Ubuntu
     runs-on: ubuntu-latest
@@ -41,25 +51,45 @@ jobs:
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy \
             build-essential pkg-config libfuse-dev cmake git qt6-base-dev qt6-tools-dev qt6-tools-dev-tools
-      - name: Build
+      - name: Build libfatx
+        shell: bash
         run: |
-          mkdir build
-          cd build
-          cmake ..
-          make install
-      - name: Test
+          pushd libfatx
+          cmake -Bbuild -S. -DCMAKE_INSTALL_PREFIX=$PWD/../install
+          cmake --build build --parallel --verbose --target install
+          popd
+      - name: Build gfatx
+        shell: bash
         run: |
-          cd tests
+          pushd gfatx
+          cmake -Bbuild -S. -DCMAKE_PREFIX_PATH=$PWD/../install
+          cmake --build build --parallel --verbose --target gfatx
+          popd
+      - name: Build fatxfs
+        shell: bash
+        run: |
+          pushd fatxfs
+          cmake -Bbuild -S. -DCMAKE_PREFIX_PATH=$PWD/../install
+          cmake --build build --parallel --verbose --target install
+          popd
+      - name: Test fatxfs
+        run: |
+          cp tests/xbox_hdd.img.tgz fatxfs
+          pushd fatxfs
           ./test.sh
-      - name: Test Python bindings
+      - name: Test pyfatx
         run: |
-          rm -rf build
+          pushd pyfatx
+
           mkdir venv
           python -m venv venv
           source venv/bin/activate
+
           pip install .
           cd tests
+          tar xvf ../../tests/xbox_hdd.img.tgz
           python test.py
+
   BuildDocker:
     name: Build Docker image on Ubuntu
     runs-on: ubuntu-latest
@@ -70,8 +100,10 @@ jobs:
         run: docker build -t fatx .
       - name: Test
         run: |
-          docker run --rm -v $PWD/tests:/work -w /work \
+          cp tests/xbox_hdd.img.tgz fatxfs
+          docker run --rm -v $PWD/fatxfs:/work -w /work \
             --device /dev/fuse --privileged fatx ./test.sh
+
   BuildMacos:
     name: Build on macOS
     runs-on: macos-latest
@@ -83,33 +115,49 @@ jobs:
           export HOMEBREW_NO_AUTO_UPDATE=1
           export HOMEBREW_NO_INSTALL_CLEANUP=1
           brew install pkgconfig cmake macfuse qt@6
-      - name: Build
+      - name: Build libfatx
+        shell: bash
+        run: |
+          pushd libfatx
+          cmake -Bbuild -S. -DCMAKE_INSTALL_PREFIX=$PWD/../install
+          cmake --build build --parallel --verbose --target install
+          popd
+      - name: Build gfatx
+        shell: bash
         run: |
           export PATH="/usr/local/opt/qt@6/bin:$PATH"
           export LDFLAGS="-L/usr/local/opt/qt@6/lib"
           export CPPFLAGS="-I/usr/local/opt/qt@6/include"
           export PKG_CONFIG_PATH="/usr/local/opt/qt@6/lib/pkgconfig"
 
-          mkdir build
-          cd build
-          cmake ..
-          make install
-      - name: Test Python bindings
+          pushd gfatx
+          cmake -Bbuild -S. -DCMAKE_PREFIX_PATH=$PWD/../install
+          cmake --build build --parallel --verbose --target gfatx
+          popd
+      - name: Build fatxfs
+        shell: bash
         run: |
-          rm -rf build
+          pushd fatxfs
+          cmake -Bbuild -S. -DCMAKE_PREFIX_PATH=$PWD/../install
+          cmake --build build --parallel --verbose --target fatxfs
+          popd
+      # XXX: Crashes
+      # - name: Test fatxfs
+      #   run: |
+      #     pushd fatxfs
+      #     ./test.sh
+      - name: Test pyfatx
+        run: |
+          pushd pyfatx
+
           mkdir venv
           python -m venv venv
           source venv/bin/activate
+
           pip install .
           cd tests
-          tar xvf xbox_hdd.img.tgz
-          python3 test.py
-      # XXX: Crashes
-      # - name: Test
-      #   run: |
-      #     cd tests
-      #     ./test.sh
-
+          tar xvf ../../tests/xbox_hdd.img.tgz
+          python test.py
 
   build_sdist:
     name: Build Python source distribution
@@ -120,11 +168,13 @@ jobs:
         with:
           python-version: '3.10'
       - name: Build sdist
-        run: python setup.py sdist
+        run: |
+          pushd pyfatx
+          python setup.py sdist
       - uses: actions/upload-artifact@v4
         with:
           name: source
-          path: dist/*.tar.gz
+          path: pyfatx/dist/*.tar.gz
 
   build_wheels:
     needs: build_sdist
