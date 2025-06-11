@@ -7,7 +7,7 @@ from typing import AnyStr, Generator, Optional, Sequence, Tuple
 
 from .libfatx import ffi
 from .libfatx.lib import *
-
+from .__version__ import __version__
 
 log = logging.getLogger(__name__)
 
