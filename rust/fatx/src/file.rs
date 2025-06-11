@@ -2,12 +2,14 @@ use std::cmp::min;
 use std::io;
 
 use crate::dir::DirectoryEntry;
-use crate::fat::FatEntry;
+use crate::fat::{ClusterId, FatEntry};
 use crate::fs::FatxFsHandle;
 
 pub struct File {
     handle: FatxFsHandle,
     dirent: DirectoryEntry,
+    cur_cluster_relative: u32,
+    cur_cluster_absolute: ClusterId,
     seek_pos: u32,
 }
 
@@ -15,8 +17,10 @@ impl File {
     pub(crate) fn new(handle: FatxFsHandle, dirent: DirectoryEntry) -> Self {
         Self {
             handle,
-            dirent,
             seek_pos: 0,
+            cur_cluster_relative: 0,
+            cur_cluster_absolute: dirent.first_cluster(),
+            dirent,
         }
     }
 
@@ -74,15 +78,24 @@ impl io::Read for File {
 
             // Map current file position to cluster number
             let cluster = {
-                let mut cluster: u32 = self.dirent.first_cluster();
-                let count = (self.seek_pos as u64 / fs.num_bytes_per_cluster) as u32;
-                for _ in 0..count {
-                    cluster = match fs.fat.entry(cluster)? {
+                let tar_cluster_relative = (self.seek_pos as u64 / fs.num_bytes_per_cluster) as u32;
+
+                // Check if we need to begin scanning from start of cluster chain
+                if tar_cluster_relative < self.cur_cluster_relative {
+                    self.cur_cluster_relative = 0;
+                    self.cur_cluster_absolute = self.dirent.first_cluster();
+                }
+
+                // Scan through the cluster chain
+                for _ in self.cur_cluster_relative..tar_cluster_relative {
+                    self.cur_cluster_absolute = match fs.fat.entry(self.cur_cluster_absolute)? {
                         FatEntry::Data(cluster) => cluster,
                         _ => return Err(io::Error::other("Corrupt FAT chain")),
                     };
                 }
-                cluster
+                self.cur_cluster_relative = tar_cluster_relative;
+
+                self.cur_cluster_absolute
             };
 
             // Determine number of bytes to read in this cluster
