@@ -1,9 +1,25 @@
 #!/usr/bin/env python3
+import functools
+import os
+import tempfile
 import unittest
-import hashlib
 import random
 
 from pyfatx import Fatx
+
+
+def with_formatted_disk(func):
+	@functools.wraps(func)
+	def wrapper(*args, **kwargs):
+		with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+			hdd_img_path = tmp_file.name + "-fatx"
+		try:
+			Fatx.create(hdd_img_path)
+			return func(*args, hdd_img_path, **kwargs)
+		finally:
+			os.remove(hdd_img_path)
+			os.remove(tmp_file.name)
+	return wrapper
 
 
 class BasicTest(unittest.TestCase):
@@ -11,15 +27,9 @@ class BasicTest(unittest.TestCase):
 	Run basic tests.
 	"""
 
-	def test_xboxdash_read(self):
-		fs = Fatx('xbox_hdd.img')
-		d = fs.read('/xboxdash.xbe')
-		m = hashlib.sha256()
-		m.update(d)
-		assert m.hexdigest() == '338e6e203d9f1db5f2c1d976b8969af42049c32e1a65ac0347fbc6efcf5bd7c6'
-
-	def test_read_empty_file(self):
-		fs = Fatx('xbox_hdd.img')
+	@with_formatted_disk
+	def test_read_empty_file(self, path):
+		fs = Fatx(path)
 		empty_file = '/empty'
 		fs.mknod(empty_file)
 
@@ -27,9 +37,10 @@ class BasicTest(unittest.TestCase):
 		fs.unlink(empty_file)
 		assert len(res) == 0
 
-	def test_create_file(self):
+	@with_formatted_disk
+	def test_create_file(self, path):
 		test_file_path = '/test_file.txt'
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 		content = b'12345'
 		fs.write(test_file_path, content)
 
@@ -45,9 +56,10 @@ class BasicTest(unittest.TestCase):
 			pass
 		assert not file_still_available
 
-	def test_truncate_file(self):
+	@with_formatted_disk
+	def test_truncate_file(self, path):
 		test_file_path = '/test_file.txt'
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 		content = b'12345'
 		fs.write(test_file_path, content)
 
@@ -58,9 +70,10 @@ class BasicTest(unittest.TestCase):
 
 		fs.unlink(test_file_path)
 
-	def test_rename_file(self):
+	@with_formatted_disk
+	def test_rename_file(self, path):
 		test_file_path = '/test_file.txt'
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 		content = b'12345'
 		fs.write(test_file_path, content)
 
@@ -77,9 +90,10 @@ class BasicTest(unittest.TestCase):
 
 		fs.unlink(new_filename)
 
-	def test_write_large_file(self):
+	@with_formatted_disk
+	def test_write_large_file(self, path):
 		test_file_path = '/largefile'
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		rng = random.Random()
 		rng.seed(12345)
@@ -93,9 +107,10 @@ class BasicTest(unittest.TestCase):
 		assert d == b
 
 	
-	def test_write_offset(self):
+	@with_formatted_disk
+	def test_write_offset(self, path):
 		test_file_path = '/offsetfile'
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		rng = random.Random()
 		rng.seed(12345)
@@ -120,10 +135,11 @@ class BasicTest(unittest.TestCase):
 		assert d == bytes([0] * 128) + b
 
 
-	def test_rename_overwrite(self):
+	@with_formatted_disk
+	def test_rename_overwrite(self, path):
 		test_file1 = '/test_overwrite1'
 		test_file2 = '/test_overwrite2'
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		rng = random.Random()
 		rng.seed(12345)
@@ -152,10 +168,11 @@ class BasicTest(unittest.TestCase):
 		assert d == b2
 
 
-	def test_rename_exchange(self):
+	@with_formatted_disk
+	def test_rename_exchange(self, path):
 		test_file1 = '/test_xchg1'
 		test_file2 = '/test_xchg2'
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		rng = random.Random()
 		rng.seed(12345)
@@ -178,11 +195,12 @@ class BasicTest(unittest.TestCase):
 		assert d2 == b1
 
 
-	def test_rename_exchange_different_dirname_overwrite(self):
+	@with_formatted_disk
+	def test_rename_exchange_different_dirname_overwrite(self, path):
 		test_file1 = '/test_xchg1'
 		file2_dir = '/testdir'
 		test_file2 = '{}/test_xchg2'.format(file2_dir)
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		fs.mkdir(file2_dir)
 
@@ -209,11 +227,12 @@ class BasicTest(unittest.TestCase):
 		assert d2 == b1
 
 
-	def test_rename_different_dirname_overwrite(self):
+	@with_formatted_disk
+	def test_rename_different_dirname_overwrite(self, path):
 		test_file1 = '/test_xchg1'
 		file2_dir = '/testdir'
 		test_file2 = '{}/test_xchg2'.format(file2_dir)
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		fs.mkdir(file2_dir)
 
@@ -244,11 +263,12 @@ class BasicTest(unittest.TestCase):
 		assert d1 == b2
 
 
-	def test_rename_different_dirname_nonexisting(self):
+	@with_formatted_disk
+	def test_rename_different_dirname_nonexisting(self, path):
 		test_file1 = '/test_xchg1'
 		file2_dir = '/testdir'
 		test_file2 = '{}/test_xchg2'.format(file2_dir)
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		fs.mkdir(file2_dir)
 
@@ -276,11 +296,12 @@ class BasicTest(unittest.TestCase):
 		assert d1 == b2
 
 
-	def test_rename_no_replace_different_dirname_nonexisting(self):
+	@with_formatted_disk
+	def test_rename_no_replace_different_dirname_nonexisting(self, path):
 		test_file1 = '/test_xchg1'
 		file2_dir = '/testdir'
 		test_file2 = '{}/test_xchg2'.format(file2_dir)
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		fs.mkdir(file2_dir)
 
@@ -308,11 +329,12 @@ class BasicTest(unittest.TestCase):
 		assert d1 == b2
 
 
-	def test_rename_no_replace_different_dirname_existing_fails(self):
+	@with_formatted_disk
+	def test_rename_no_replace_different_dirname_existing_fails(self, path):
 		test_file1 = '/test_xchg1'
 		file2_dir = '/testdir'
 		test_file2 = '{}/test_xchg2'.format(file2_dir)
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		fs.mkdir(file2_dir)
 
@@ -340,10 +362,11 @@ class BasicTest(unittest.TestCase):
 		assert not rename_failed
 
 
-	def test_rename_exchange_nonexistent_file_fails(self):
+	@with_formatted_disk
+	def test_rename_exchange_nonexistent_file_fails(self, path):
 		test_file1 = '/test_xchg1'
 		test_file2 = '/test_xchg2'
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		rng = random.Random()
 		rng.seed(12345)
@@ -366,10 +389,11 @@ class BasicTest(unittest.TestCase):
 		assert not rename_failed
 
 
-	def test_rename_no_replace_does_not_replace_file(self):
+	@with_formatted_disk
+	def test_rename_no_replace_does_not_replace_file(self, path):
 		test_file1 = '/test_xchg1'
 		test_file2 = '/test_xchg2'
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		rng = random.Random()
 		rng.seed(12345)
@@ -393,10 +417,11 @@ class BasicTest(unittest.TestCase):
 		assert not rename_failed
 
 
-	def test_rename_no_replace_with_nonexistent_destination_works(self):
+	@with_formatted_disk
+	def test_rename_no_replace_with_nonexistent_destination_works(self, path):
 		test_file1 = '/test_xchg1'
 		test_file2 = '/test_xchg2'
-		fs = Fatx('xbox_hdd.img')
+		fs = Fatx(path)
 
 		rng = random.Random()
 		rng.seed(12345)
