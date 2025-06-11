@@ -3,9 +3,11 @@ name: Build Rust crates
 on:
   push:
     paths-include:
+      - '.github/workflows/build-rust.yml'
       - 'rust/**'
   pull_request:
     paths-include:
+      - '.github/workflows/build-rust.yml'
       - 'rust/**'
 
 jobs:
