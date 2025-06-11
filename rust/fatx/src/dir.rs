@@ -201,9 +201,13 @@ impl DirectoryEntryIterator {
 
         if (self.entry >= 0) && (self.entry as u64 >= fs.num_entries_per_cluster) {
             // Advance to next cluster
-            let fat_entry = fs.fat.entry(self.cluster).unwrap();
+            let fat_entry = fs.fat.entry(self.cluster);
             match fat_entry {
-                FatEntry::Data(next_cluster) => {
+                Err(err) => {
+                    self.finished = true;
+                    return Some(Err(err));
+                }
+                Ok(FatEntry::Data(next_cluster)) => {
                     self.cluster = next_cluster as ClusterId;
                     self.entry = 0;
                 }
