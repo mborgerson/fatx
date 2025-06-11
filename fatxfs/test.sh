@@ -8,8 +8,12 @@ function checksum {
 mkdir -p c
 
 # Format the disk
-fallocate -l 8G xbox_hdd.img
-fatxfs --format=retail --destroy-all-existing-data  xbox_hdd.img c
+if [[ "$(uname)" == "Darwin" ]]; then
+	truncate -s 8g xbox_hdd.img
+else
+	fallocate -l 8G xbox_hdd.img
+fi
+fatxfs --format=retail --destroy-all-existing-data xbox_hdd.img c
 sleep 1
 
 # Copy a file in
