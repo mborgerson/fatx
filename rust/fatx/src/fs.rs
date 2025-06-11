@@ -2,12 +2,11 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::{Arc, Mutex, Weak};
 
-use crate::PartitionMapEntry;
 use crate::dir::{DirectoryEntry, DirectoryEntryIntoIterator};
 use crate::error::Error;
 use crate::fat::{ClusterId, Fat};
 use crate::file::File;
-use crate::partition::DEFAULT_PARTITION_LAYOUT;
+use crate::partition::{DEFAULT_PARTITION_LAYOUT, PartitionMapEntry};
 
 use zerocopy::byteorder::little_endian::{U16, U32};
 use zerocopy::*;
@@ -52,14 +51,11 @@ pub struct FatxFsConfig {
 
 impl FatxFsConfig {
     pub fn new(device_path: String) -> Self {
-        let layout = &DEFAULT_PARTITION_LAYOUT[3];
-        let partition_offset_bytes: u64 = layout.offset_bytes;
-        let partition_size_bytes: u64 = layout.size_bytes;
-
+        let partition = &DEFAULT_PARTITION_LAYOUT[3];
         Self {
             device_path,
-            partition_offset_bytes,
-            partition_size_bytes,
+            partition_offset_bytes: partition.offset_bytes,
+            partition_size_bytes: partition.size_bytes,
             num_bytes_per_sector: 512,
         }
     }
