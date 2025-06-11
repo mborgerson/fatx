@@ -26,7 +26,7 @@ jobs:
       run: |
         export HOMEBREW_NO_AUTO_UPDATE=1
         export HOMEBREW_NO_INSTALL_CLEANUP=1
-        brew install pkgconf macfuse
+        brew install macfuse
 
     - name: Install fuse (Ubuntu)
       if: startsWith(matrix.os, 'ubuntu')
