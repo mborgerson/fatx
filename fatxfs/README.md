@@ -18,6 +18,8 @@ How to Build (Natively)
 -----------------------
 ### Prerequisites
 
+Note: You'll need to build and install libfatx first.
+
 #### Ubuntu
 Assuming you already have typical build tools installed, install FUSE and CMake:
 
@@ -33,7 +35,7 @@ Assuming you have homebrew installed, install `pkgconfig` and `cmake`:
 ### Download Source
 Clone the repository:
 
-    $ git clone https://github.com/mborgerson/fatx && cd fatx
+    $ git clone https://github.com/mborgerson/fatx && cd fatx/fatxfs
 
 ### Build
 Create a build directory and run `cmake` to construct the Makefiles:
