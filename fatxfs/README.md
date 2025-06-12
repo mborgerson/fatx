@@ -64,6 +64,8 @@ Or, you can specify the offset and size of the partition manually:
 
     $ ./fatxfs /dev/nbd0 c_drive --offset=0x8ca80000 --size=0x01f400000
 
+To mount an XMU, use: --sector-size=4096 --offset=0 --size=XMU_SIZE_IN_BYTES
+
 Tips
 ----
 ### Mounting a qcow Image
