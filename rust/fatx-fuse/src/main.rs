@@ -62,14 +62,12 @@ fn fatx_datetime_to_systemtime(datetime: fatx::DateTime) -> SystemTime {
         datetime.year().into(),
         datetime.month().into(),
         datetime.day().into(),
+    ) && let Some(datetime) = date.and_hms_opt(
+        datetime.hour().into(),
+        datetime.minute().into(),
+        datetime.second().into(),
     ) {
-        if let Some(datetime) = date.and_hms_opt(
-            datetime.hour().into(),
-            datetime.minute().into(),
-            datetime.second().into(),
-        ) {
-            return SystemTime::from(datetime.and_utc());
-        }
+        return SystemTime::from(datetime.and_utc());
     }
 
     // Failed to convert datetime. Supply default.
