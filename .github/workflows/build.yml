@@ -175,41 +175,38 @@ jobs:
 
   build_wheels:
     needs: build_sdist
-    name: Build wheel ${{ matrix.wheel }} on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Build wheel (${{ matrix.platform.py }}, ${{ matrix.platform.wheel_tag }})
+    runs-on: ${{ matrix.platform.os }}
     strategy:
       matrix:
-        include:
-          # - { os: macos-latest,   wheel: cp313-macosx_x86_64 }
-          - { os: windows-latest, wheel: cp313-win_amd64 }
-          - { os: ubuntu-latest,  wheel: cp313-manylinux_x86_64 }
-
+        py: [cp313, cp314]
+        platform:
+          - { arch: x86_64,  os: windows-latest,   wheel_tag: win_amd64         }
+          - { arch: x86_64,  os: macos-15-intel,   wheel_tag: macosx_x86_64     }
+          - { arch: arm64,   os: macos-latest,     wheel_tag: macosx_arm64      }
+          - { arch: x86_64,  os: ubuntu-latest,    wheel_tag: manylinux_x86_64  }
+          - { arch: aarch64, os: ubuntu-24.04-arm, wheel_tag: manylinux_aarch64 }
     steps:
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
       - name: Download source distribution
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: source
-      - name: Get package name
-        run: python -c "import os, glob; open(os.environ['GITHUB_ENV'], 'w').write('PKG=' + glob.glob('pyfatx-*.tar.gz')[0][0:-7] + '\n')"
       - name: Unpack source distribution
-        run: tar -xf ${{ env.PKG }}.tar.gz
-      - name: Install cibuildwheel
-        run: python -m pip install cibuildwheel==2.23.3
-      - name: Build wheels
-        run: python -m cibuildwheel --output-dir wheelhouse ${{ env.PKG }}
-        env:
-          CIBW_BUILD: ${{ matrix.wheel }}
-          # manylinux container has an old cmake. Simply grab recent cmake from
-          # pypi. Other platforms use recent cmake provided by GH actions host.
-          CIBW_BEFORE_BUILD_LINUX: pip install cmake
-          # CIBW_TEST_COMMAND: python -m unittest discover -v -s {package}/tests
-          CIBW_BUILD_VERBOSITY: 1
-      - uses: actions/upload-artifact@v4
+        shell: bash
+        run: tar --strip-components 1 -xvf *.tar.gz
+      - name: Build wheel
+        uses: pypa/cibuildwheel@63fd63b352a9a8bdcc24791c9dbee952ee9a8abc # v3.3.0
         with:
-          name: wheel-${{ matrix.wheel }}
+          output-dir: wheelhouse
+        env:
+          CIBW_ARCHS_MACOS: ${{ matrix.platform.arch }}
+          CIBW_BUILD: ${{ matrix.py }}-${{ matrix.platform.wheel_tag }}
+          CIBW_TEST_COMMAND: python -m unittest discover -v -s {package}/tests
+          CIBW_BUILD_VERBOSITY: 1
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.platform.arch == 'arm64' && '11' || '10.14' }}
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ${{ matrix.py }}-${{ matrix.platform.wheel_tag }}
           path: ./wheelhouse/*.whl
 
   upload_pypi:
