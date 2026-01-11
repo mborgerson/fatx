@@ -20,7 +20,7 @@ jobs:
     runs-on: windows-latest
     steps:
     - name: Clone
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
       with:
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Build
         run: docker build -t fatx .
       - name: Test
@@ -106,7 +106,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install dependencies
         run: |
           export HOMEBREW_NO_AUTO_UPDATE=1
@@ -159,7 +159,7 @@ jobs:
     name: Build Python source distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
