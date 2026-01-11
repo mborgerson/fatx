@@ -72,10 +72,16 @@ impl FatxFsConfig {
 impl FatxFs {
     pub fn open_device(config: &FatxFsConfig) -> Result<FatxFsHandle, Error> {
         // Partition offset and size validation
-        if config.partition_offset_bytes % config.num_bytes_per_sector != 0 {
+        if !config
+            .partition_offset_bytes
+            .is_multiple_of(config.num_bytes_per_sector)
+        {
             return Err(Error::InvalidPartitionOffset);
         }
-        if config.partition_size_bytes % config.num_bytes_per_sector != 0 {
+        if !config
+            .partition_size_bytes
+            .is_multiple_of(config.num_bytes_per_sector)
+        {
             return Err(Error::InvalidPartitionSize);
         }
 
