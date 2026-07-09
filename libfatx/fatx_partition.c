@@ -110,6 +110,20 @@ int fatx_read_superblock(struct fatx_fs *fs)
         return FATX_STATUS_ERROR;
     }
 
+    /* Guard against a corrupt superblock: sectors_per_cluster of 0 causes a
+     * division by zero (floating point exception) in the geometry math, and
+     * values that are not a power of two up to 1024 are not produced by any
+     * known formatter. This turns a crash into a clean error (issues #55, #26).
+     */
+    if (superblock.sectors_per_cluster == 0 ||
+        (superblock.sectors_per_cluster & (superblock.sectors_per_cluster - 1)) != 0 ||
+        superblock.sectors_per_cluster > 1024)
+    {
+        fatx_error(fs, "invalid sectors per cluster: %d\n",
+                   (int)superblock.sectors_per_cluster);
+        return FATX_STATUS_ERROR;
+    }
+
     fs->volume_id = superblock.volume_id;
     fs->sectors_per_cluster = superblock.sectors_per_cluster;
     fs->root_cluster = superblock.root_cluster;
