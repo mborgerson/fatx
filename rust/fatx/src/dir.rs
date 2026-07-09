@@ -40,6 +40,13 @@ pub struct DirectoryEntry {
     accessed_date: U16,
 }
 
+/// On-disk location of a directory slot (cluster + entry index within it).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DirectoryEntryLocation {
+    pub cluster: ClusterId,
+    pub index: u64,
+}
+
 #[derive(Debug, PartialEq)]
 pub enum DirectoryEntryKind {
     Valid,
@@ -174,6 +181,99 @@ impl DirectoryEntry {
 
     pub(crate) fn first_cluster(&self) -> ClusterId {
         self.first_cluster.into()
+    }
+
+    // ── Write-support helpers ───────────────────────────────────────────────
+
+    /// Valid FATX name: 1..=42 bytes, printable ASCII minus reserved chars.
+    pub fn is_valid_name(name: &str) -> bool {
+        const RESERVED: &[u8] = b"\\/:*?\"<>|";
+        let b = name.as_bytes();
+        !b.is_empty()
+            && b.len() <= FATX_MAX_FILENAME_LEN
+            && name != "."
+            && name != ".."
+            && b.iter().all(|&c| (0x20..0x7F).contains(&c) && !RESERVED.contains(&c))
+    }
+
+    /// Fresh entry (file or directory) stamped with the current time.
+    pub(crate) fn new_now(name: &str, dir: bool, first_cluster: ClusterId) -> Self {
+        let (date, time) = DateTime::now().to_fatx_encoding();
+        let mut filename_bytes = [0xFFu8; FATX_MAX_FILENAME_LEN];
+        filename_bytes[..name.len()].copy_from_slice(name.as_bytes());
+        Self {
+            filename_len: name.len() as u8,
+            attributes: if dir { FATX_ATTR_DIRECTORY } else { 0 },
+            filename_bytes,
+            first_cluster: first_cluster.into(),
+            file_size: 0.into(),
+            modified_time: time.into(),
+            modified_date: date.into(),
+            created_time: time.into(),
+            created_date: date.into(),
+            accessed_time: time.into(),
+            accessed_date: date.into(),
+        }
+    }
+
+    pub(crate) fn set_name(&mut self, name: &str) -> Result<(), Error> {
+        if !Self::is_valid_name(name) {
+            return Err(Error::InvalidName);
+        }
+        self.filename_bytes = [0xFFu8; FATX_MAX_FILENAME_LEN];
+        self.filename_bytes[..name.len()].copy_from_slice(name.as_bytes());
+        self.filename_len = name.len() as u8;
+        Ok(())
+    }
+
+    pub(crate) fn set_first_cluster(&mut self, cluster: ClusterId) {
+        self.first_cluster = cluster.into();
+    }
+
+    pub(crate) fn set_file_size(&mut self, size: u32) {
+        self.file_size = size.into();
+    }
+
+    pub(crate) fn touch_modified(&mut self) {
+        let (date, time) = DateTime::now().to_fatx_encoding();
+        self.modified_date = date.into();
+        self.modified_time = time.into();
+    }
+
+    /// Scans one directory for `name` (FATX compares case-insensitively).
+    /// Returns the entry and its on-disk slot location.
+    pub(crate) fn find_in_dir(
+        fs: &mut FatxFs,
+        dir_cluster: ClusterId,
+        name: &str,
+    ) -> Result<Option<(Self, DirectoryEntryLocation)>, Error> {
+        let mut cluster = dir_cluster;
+        let mut guard = 0u64;
+        loop {
+            for index in 0..fs.num_entries_per_cluster {
+                let dirent = fs.read_dirent_at(cluster, index)?;
+                match dirent.kind() {
+                    DirectoryEntryKind::EndOfDirectory => return Ok(None),
+                    DirectoryEntryKind::Deleted => {}
+                    DirectoryEntryKind::Valid => {
+                        if dirent.file_name().eq_ignore_ascii_case(name) {
+                            return Ok(Some((
+                                dirent,
+                                DirectoryEntryLocation { cluster, index },
+                            )));
+                        }
+                    }
+                }
+            }
+            match fs.fat.entry(cluster)? {
+                FatEntry::Data(next) => cluster = next,
+                _ => return Ok(None),
+            }
+            guard += 1;
+            if guard > fs.num_clusters as u64 {
+                return Err(Error::InvalidClusterChain);
+            }
+        }
     }
 }
 

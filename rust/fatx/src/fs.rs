@@ -12,8 +12,8 @@ use zerocopy::byteorder::little_endian::{U16, U32};
 use zerocopy::*;
 
 const FATX_SIGNATURE: u32 = 0x58544146; // 'FATX'
-const FATX_FAT_OFFSET_BYTES: u64 = 4096;
-const FATX_FAT_RESERVED_ENTRIES_COUNT: u32 = 1;
+pub(crate) const FATX_FAT_OFFSET_BYTES: u64 = 4096;
+pub(crate) const FATX_FAT_RESERVED_ENTRIES_COUNT: u32 = 1;
 
 // The superblock, as it appears on disk.
 #[derive(FromBytes, IntoBytes, KnownLayout, Immutable, Unaligned, Debug)]
@@ -40,6 +40,9 @@ pub struct FatxFs {
     pub(crate) root_cluster: u32,
     pub(crate) cluster_offset_bytes: u64,
     pub(crate) fat: Fat,
+    /// Rotating allocation hint (mirrors libfatx's scan pointer, per-fs).
+    pub(crate) alloc_hint: u32,
+    pub(crate) writable: bool,
 }
 
 pub struct FatxFsConfig {
@@ -47,6 +50,7 @@ pub struct FatxFsConfig {
     partition_offset_bytes: u64,
     partition_size_bytes: u64,
     num_bytes_per_sector: u64,
+    writable: bool,
 }
 
 impl FatxFsConfig {
@@ -57,7 +61,14 @@ impl FatxFsConfig {
             partition_offset_bytes: partition.offset_bytes,
             partition_size_bytes: partition.size_bytes,
             num_bytes_per_sector: 512,
+            writable: false,
         }
+    }
+
+    /// Opens the device read-write, enabling the write API.
+    pub fn writable(mut self, writable: bool) -> Self {
+        self.writable = writable;
+        self
     }
 
     pub fn drive_letter(mut self, letter: &str) -> Self {
@@ -86,7 +97,10 @@ impl FatxFs {
         }
 
         // Open device
-        let mut device_handle = std::fs::File::open(&config.device_path)?;
+        let mut device_handle = std::fs::OpenOptions::new()
+            .read(true)
+            .write(config.writable)
+            .open(&config.device_path)?;
         device_handle.seek(SeekFrom::Start(config.partition_offset_bytes))?;
 
         // Read superblock
@@ -137,6 +151,8 @@ impl FatxFs {
                 root_cluster,
                 cluster_offset_bytes,
                 fat,
+                alloc_hint: FATX_FAT_RESERVED_ENTRIES_COUNT + 1,
+                writable: config.writable,
             })
         });
 

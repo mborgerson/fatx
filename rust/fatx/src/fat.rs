@@ -59,6 +59,43 @@ pub(crate) struct Fat {
 }
 
 impl Fat {
+    /// FAT entry width in bytes (2 for FAT16, 4 for FAT32).
+    pub(crate) fn entry_width(&self) -> u8 {
+        match self.fat_type {
+            FatType::Type16 => 2,
+            FatType::Type32 => 4,
+        }
+    }
+
+    /// End-of-chain marker value for this FAT width.
+    pub(crate) fn end_marker(&self) -> u32 {
+        match self.fat_type {
+            FatType::Type16 => 0xFFFF,
+            FatType::Type32 => 0xFFFF_FFFF,
+        }
+    }
+
+    /// Sets a raw entry value in the in-memory FAT (caller persists to disk).
+    pub(crate) fn set_raw(&mut self, index: FatEntryId, value: u32) -> Result<(), Error> {
+        match self.fat_type {
+            FatType::Type16 => {
+                let off = index as usize * 2;
+                if off + 2 > self.fat_data.len() {
+                    return Err(Error::InvalidClusterNumber);
+                }
+                self.fat_data[off..off + 2].copy_from_slice(&(value as u16).to_le_bytes());
+            }
+            FatType::Type32 => {
+                let off = index as usize * 4;
+                if off + 4 > self.fat_data.len() {
+                    return Err(Error::InvalidClusterNumber);
+                }
+                self.fat_data[off..off + 4].copy_from_slice(&value.to_le_bytes());
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn new(num_fat_entries: u32) -> Self {
         // NOTE: this *MUST* be kept below the Cluster Reserved marker for FAT16
         let (fat_type, fat_size_bytes) = if num_fat_entries < 0xfff0 {
