@@ -56,14 +56,14 @@
 #define FATX_EPOCH                   2000
 
 /* Macros to unpack date/time values. */
-#define FATX_TIME_TO_HOUR(t)         (((t)>>11)&0xf)
-#define FATX_TIME_TO_MINUTE(t)       (((t)>>5)&0x1f)
+#define FATX_TIME_TO_HOUR(t)         (((t)>>11)&0x1f)
+#define FATX_TIME_TO_MINUTE(t)       (((t)>>5)&0x3f)
 #define FATX_TIME_TO_SECOND(t)       (((t)&0x1f)*2)
 #define FATX_DATE_TO_YEAR(d)         ((((d)>>9)&0x7f)+FATX_EPOCH)
 #define FATX_DATE_TO_MONTH(d)        (((d)>>5)&0xf)
 #define FATX_DATE_TO_DAY(d)          ((d)&0x1f)
 #define FATX_DATE(d, m, y)           ((d&0x1f) | ((m&0xf) << 5) | (((y - FATX_EPOCH)&0x7f) << 9))
-#define FATX_TIME(h, m, s)           (((h&0xf) << 11) | ((m&0x1f) << 5) | ((s / 2)&0x1f))
+#define FATX_TIME(h, m, s)           (((h&0x1f) << 11) | ((m&0x3f) << 5) | ((s / 2)&0x1f))
 
 /* Default seperator. */
 #define FATX_PATH_SEPERATOR          '/'
