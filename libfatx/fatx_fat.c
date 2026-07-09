@@ -517,3 +517,36 @@ int fatx_attach_cluster(struct fatx_fs *fs, size_t tail, size_t cluster)
 
     return FATX_STATUS_SUCCESS;
 }
+
+/*
+ * Count total and free data clusters (for statfs-style reporting).
+ *
+ * Free space is derived directly from the FAT, so `used = total - free` can
+ * never drift or go negative regardless of the operation history.
+ */
+int fatx_get_fs_stat(struct fatx_fs *fs, uint64_t *total_clusters, uint64_t *free_clusters)
+{
+    size_t cluster;
+    fatx_fat_entry entry;
+    uint64_t free_count = 0;
+    int status;
+
+    fatx_debug(fs, "fatx_get_fs_stat()\n");
+
+    for (cluster = FATX_FAT_RESERVED_ENTRIES_COUNT; cluster < fs->num_clusters; cluster++)
+    {
+        status = fatx_read_fat(fs, cluster, &entry);
+        if (status != FATX_STATUS_SUCCESS)
+        {
+            return status;
+        }
+        if (fatx_get_fat_entry_type(fs, entry) == FATX_CLUSTER_AVAILABLE)
+        {
+            free_count += 1;
+        }
+    }
+
+    *total_clusters = fs->num_clusters - FATX_FAT_RESERVED_ENTRIES_COUNT;
+    *free_clusters  = free_count;
+    return FATX_STATUS_SUCCESS;
+}

@@ -31,6 +31,7 @@
 /* Define the desired FUSE API (required before including fuse.h) */
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
+#include <sys/statvfs.h>
 #include <fuse_opt.h>
 
 #include <time.h>
@@ -93,6 +94,7 @@ int fatx_fuse_opt_proc(void *data, const char *arg, int key, struct fuse_args *o
  * Helper functions.
  */
 struct fatx_fuse_private_data *fatx_fuse_get_private_data(void);
+int fatx_fuse_statfs(const char *path, struct statvfs *stat);
 void fatx_fuse_print_usage(void);
 void fatx_fuse_print_version(void);
 
@@ -112,7 +114,38 @@ static struct fuse_operations fatx_fuse_oper = {
     .truncate = fatx_fuse_truncate,
     .rename   = fatx_fuse_rename,
     .utimens  = fatx_fuse_utimens,
+    .statfs   = fatx_fuse_statfs,
 };
+
+/*
+ * Report filesystem statistics (df/statvfs). Without this callback FUSE
+ * reports zero blocks, so tools like `df` show 0/0 and applications cannot
+ * detect the amount of free space before writing.
+ */
+int fatx_fuse_statfs(const char *path, struct statvfs *stat)
+{
+    struct fatx_fuse_private_data *pd;
+    uint64_t total_clusters, free_clusters;
+
+    pd = fatx_fuse_get_private_data();
+    if (pd == NULL) return -EFAULT;
+
+    if (fatx_get_fs_stat(pd->fs, &total_clusters, &free_clusters) != FATX_STATUS_SUCCESS)
+    {
+        return -EIO;
+    }
+
+    memset(stat, 0, sizeof(*stat));
+    stat->f_bsize   = pd->fs->bytes_per_cluster;
+    stat->f_frsize  = pd->fs->bytes_per_cluster;
+    stat->f_blocks  = total_clusters;
+    stat->f_bfree   = free_clusters;
+    stat->f_bavail  = free_clusters;
+    stat->f_files   = 0;
+    stat->f_ffree   = ~0UL / 2;
+    stat->f_namemax = FATX_MAX_FILENAME_LEN;
+    return 0;
+}
 
 /*
  * Simple convenince function to get the private data struct.
