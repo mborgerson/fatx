@@ -504,8 +504,8 @@ struct Cli {
     #[arg()]
     device_path: String,
 
-    /// FUSE filesystem mount point
-    #[arg()]
+    /// FUSE filesystem mount point (not required with --list)
+    #[arg(default_value = "")]
     mount_point: String,
 
     /// Drive letter of c|e|x|y|z
@@ -523,11 +523,99 @@ struct Cli {
     /// Mount read-only (writes are enabled by default)
     #[arg(long)]
     read_only: bool,
+
+    /// List FATX partitions found on the device and exit (mount point not required)
+    #[arg(long)]
+    list: bool,
+
+    /// Mount ALL detected partitions under the mount point, one subdirectory
+    /// per drive letter (x y z c e f). Ctrl-C unmounts everything.
+    #[arg(long)]
+    all: bool,
+}
+
+/// Probes every known original-Xbox partition offset for the FATX signature.
+/// Returns (letter, offset, size) for each match; size 0 = to end of device.
+fn probe(device: &str) -> std::io::Result<Vec<(&'static str, u64, u64)>> {
+    use std::io::{Read, Seek};
+    let mut f = std::fs::File::open(device)?;
+    let mut found = Vec::new();
+    for entry in fatx::DEFAULT_PARTITION_LAYOUT {
+        if f.seek(std::io::SeekFrom::Start(entry.offset_bytes)).is_err() {
+            continue;
+        }
+        let mut sig = [0u8; 4];
+        if f.read_exact(&mut sig).is_ok() && &sig == b"FATX" {
+            found.push((entry.letter, entry.offset_bytes, entry.size_bytes));
+        }
+    }
+    Ok(found)
+}
+
+fn wait_for_ctrl_c() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let stop = Arc::new(AtomicBool::new(false));
+    let s2 = stop.clone();
+    ctrlc::set_handler(move || s2.store(true, Ordering::SeqCst))
+        .expect("installing Ctrl-C handler");
+    while !stop.load(Ordering::SeqCst) {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
 }
 
 fn main() {
     env_logger::init();
     let cli = Cli::parse();
+
+    if cli.list {
+        let parts = probe(&cli.device_path).expect("probing device");
+        if parts.is_empty() {
+            println!("No FATX partitions found on {}", cli.device_path);
+            return;
+        }
+        println!("{:<7} {:<14} SIZE", "LETTER", "OFFSET");
+        for (letter, offset, size) in parts {
+            let size = if size == 0 { "to-end".into() } else { format!("{size:#x}") };
+            println!("{letter:<7} {offset:<#14x} {size}");
+        }
+        return;
+    }
+    if cli.mount_point.is_empty() {
+        eprintln!("error: mount point required (or use --list)");
+        std::process::exit(2);
+    }
+
+    if cli.all {
+        let parts = probe(&cli.device_path).expect("probing device");
+        assert!(!parts.is_empty(), "no FATX partitions found");
+        let mut sessions = Vec::new();
+        for (letter, _, _) in &parts {
+            let dir = std::path::Path::new(&cli.mount_point).join(letter);
+            std::fs::create_dir_all(&dir).expect("creating mount subdirectory");
+            let config = FatxFsConfig::new(cli.device_path.clone())
+                .drive_letter(letter)
+                .writable(!cli.read_only);
+            let fs = FuseFatxFs {
+                fatx: FatxFs::open_device(&config).expect("opening partition"),
+                inodes: InodeTracker::new(),
+            };
+            let mut options = vec![MountOption::FSName(format!("fatx.{letter}"))];
+            if cli.read_only {
+                options.push(MountOption::RO);
+            }
+            eprintln!("fatx-fuse: {} -> {}", letter, dir.display());
+            sessions.push(
+                fuser::spawn_mount2(fs, &dir, &options).expect("mounting partition"),
+            );
+        }
+        eprintln!("fatx-fuse: {} partition(s) mounted — Ctrl-C to unmount all", sessions.len());
+        wait_for_ctrl_c();
+        drop(sessions);
+        eprintln!("fatx-fuse: all partitions unmounted");
+        return;
+    }
+
     let mut options = vec![MountOption::FSName("fatx".to_string())];
     if cli.read_only {
         options.push(MountOption::RO);
