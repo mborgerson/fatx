@@ -214,11 +214,11 @@ int fatx_read_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry *entry)
 
     if (fs->fat_type == FATX_FAT_TYPE_16)
     {
-        *entry = ((uint16_t*) cache->data)[index - cache->position];
+        *entry = fatx_le16(((uint16_t*) cache->data)[index - cache->position]);
     }
     else
     {
-        *entry = ((uint32_t*) cache->data)[index - cache->position];
+        *entry = fatx_le32(((uint32_t*) cache->data)[index - cache->position]);
     }
 
     return FATX_STATUS_SUCCESS;
@@ -251,11 +251,11 @@ int fatx_write_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry entry)
 
     if (fs->fat_type == FATX_FAT_TYPE_16)
     {
-        ((uint16_t*) cache->data)[index - cache->position] = entry;
+        ((uint16_t*) cache->data)[index - cache->position] = fatx_le16(entry);
     }
     else
     {
-        ((uint32_t*) cache->data)[index - cache->position] = entry;
+        ((uint32_t*) cache->data)[index - cache->position] = fatx_le32(entry);
     }
 
     cache->dirty = true;

@@ -131,6 +131,20 @@ struct fatx_raw_directory_entry {
 
 typedef uint32_t fatx_fat_entry;
 
+/* On-disk FATX structures are little-endian. These helpers convert between
+ * disk and host byte order; on little-endian hosts they compile to nothing.
+ * (Issue #62.)
+ */
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+static inline uint16_t fatx_le16(uint16_t v) { return __builtin_bswap16(v); }
+static inline uint32_t fatx_le32(uint32_t v) { return __builtin_bswap32(v); }
+static inline uint64_t fatx_le64(uint64_t v) { return __builtin_bswap64(v); }
+#else
+static inline uint16_t fatx_le16(uint16_t v) { return v; }
+static inline uint32_t fatx_le32(uint32_t v) { return v; }
+static inline uint64_t fatx_le64(uint64_t v) { return v; }
+#endif
+
 /* Partition Functions */
 int fatx_check_partition_signature(struct fatx_fs *fs);
 int fatx_init_superblock(struct fatx_fs *fs, size_t sectors_per_cluster);

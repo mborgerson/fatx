@@ -29,15 +29,16 @@ int fatx_dirent_to_attr(struct fatx_fs *fs, struct fatx_raw_directory_entry *ent
     attr->filename[entry->filename_len] = '\0';
 
     attr->attributes    = entry->attributes;
-    attr->first_cluster = entry->first_cluster;
-    attr->file_size     = entry->file_size;
+    /* On-disk fields are little-endian (issue #62). */
+    attr->first_cluster = fatx_le32(entry->first_cluster);
+    attr->file_size     = fatx_le32(entry->file_size);
 
-    fatx_unpack_date(entry->modified_date, &(attr->modified));
-    fatx_unpack_time(entry->modified_time, &(attr->modified));
-    fatx_unpack_date(entry->created_date,  &(attr->created));
-    fatx_unpack_time(entry->created_time,  &(attr->created));
-    fatx_unpack_date(entry->accessed_date, &(attr->accessed));
-    fatx_unpack_time(entry->accessed_time, &(attr->accessed));
+    fatx_unpack_date(fatx_le16(entry->modified_date), &(attr->modified));
+    fatx_unpack_time(fatx_le16(entry->modified_time), &(attr->modified));
+    fatx_unpack_date(fatx_le16(entry->created_date),  &(attr->created));
+    fatx_unpack_time(fatx_le16(entry->created_time),  &(attr->created));
+    fatx_unpack_date(fatx_le16(entry->accessed_date), &(attr->accessed));
+    fatx_unpack_time(fatx_le16(entry->accessed_time), &(attr->accessed));
 
     return FATX_STATUS_SUCCESS;
 }
@@ -52,8 +53,9 @@ int fatx_attr_to_dirent(struct fatx_fs *fs, struct fatx_attr *attr, struct fatx_
     memcpy(entry->filename, attr->filename, filename_len);
 
     entry->attributes    = attr->attributes;
-    entry->first_cluster = attr->first_cluster;
-    entry->file_size     = attr->file_size;
+    /* On-disk fields are little-endian (issue #62). */
+    entry->first_cluster = fatx_le32(attr->first_cluster);
+    entry->file_size     = fatx_le32(attr->file_size);
 
     fatx_pack_date(&(attr->modified), &(entry->modified_date));
     fatx_pack_time(&(attr->modified), &(entry->modified_time));
@@ -61,6 +63,12 @@ int fatx_attr_to_dirent(struct fatx_fs *fs, struct fatx_attr *attr, struct fatx_
     fatx_pack_time(&(attr->created),  &(entry->created_time));
     fatx_pack_date(&(attr->accessed), &(entry->accessed_date));
     fatx_pack_time(&(attr->accessed), &(entry->accessed_time));
+    entry->modified_date = fatx_le16(entry->modified_date);
+    entry->modified_time = fatx_le16(entry->modified_time);
+    entry->created_date  = fatx_le16(entry->created_date);
+    entry->created_time  = fatx_le16(entry->created_time);
+    entry->accessed_date = fatx_le16(entry->accessed_date);
+    entry->accessed_time = fatx_le16(entry->accessed_time);
 
     return FATX_STATUS_SUCCESS;
 }

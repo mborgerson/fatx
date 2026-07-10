@@ -234,9 +234,9 @@ int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint
     }
 
     memset(&refurb_info, 0, sizeof(struct fatx_refurb_info));
-    refurb_info.signature = FATX_REFURB_SIGNATURE;
-    refurb_info.number_of_boots = number_of_boots;
-    refurb_info.first_power_on = first_power_on;
+    refurb_info.signature = fatx_le32(FATX_REFURB_SIGNATURE);
+    refurb_info.number_of_boots = fatx_le32(number_of_boots);
+    refurb_info.first_power_on = fatx_le64(first_power_on);
 
     if (fwrite(&refurb_info, sizeof(struct fatx_refurb_info), 1, device) != 1)
     {
