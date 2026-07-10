@@ -265,7 +265,12 @@ int fatx_write_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent 
         return FATX_STATUS_ERROR;
     }
 
-    /* Construct the raw directory entry */
+    /* Construct the raw directory entry. The struct lives on the stack, so
+     * initialize it fully first: without this, the filename padding (and any
+     * other untouched field) leaks arbitrary stack bytes to disk. 0xFF is the
+     * conventional FATX fill for the unused part of the name field.
+     */
+    memset(&directory_entry, 0xFF, sizeof(directory_entry));
     size_t filename_len = strlen(entry->filename);
     memcpy(directory_entry.filename, entry->filename, filename_len);
 
