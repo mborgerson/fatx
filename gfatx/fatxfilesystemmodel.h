@@ -3,6 +3,8 @@
 
 #include <QAbstractItemModel>
 #include <QFileIconProvider>
+#include <QDir>
+#include <QFile>
 #include <fatx.h>
 #include <assert.h>
 
@@ -33,6 +35,9 @@ struct NodeDisk : NodeBase {
 struct NodePartition : NodeBase {
     struct fatx_fs *fs;
     std::string name;
+    uint64_t total_clusters = 0;
+    uint64_t free_clusters = 0;
+    uint64_t bytes_per_cluster = 0;
 };
 
 struct NodeFile : NodeBase
@@ -100,6 +105,52 @@ protected:
     }
 
 public:
+    /// Extracts the file or directory at `index` into local directory `destDir`.
+    /// Returns the number of files written, -1 on error.
+    int extractIndex(const QModelIndex &index, const QString &destDir)
+    {
+        if (!index.isValid()) return -1;
+        auto node = static_cast<struct NodeBase *>(index.internalPointer());
+        if (node->type != NODETYPE_FILE) return -1;
+        /* find the owning partition for the fatx_fs handle */
+        auto p = node;
+        while (p->parent && p->type != NODETYPE_PARTITION) p = p->parent;
+        if (p->type != NODETYPE_PARTITION) return -1;
+        return extractNode(static_cast<struct NodePartition *>(p)->fs,
+                           static_cast<struct NodeFile *>(node), destDir);
+    }
+
+protected:
+    int extractNode(struct fatx_fs *fs, struct NodeFile *node, const QString &destDir)
+    {
+        QString name = QString::fromLocal8Bit(node->attr.filename);
+        QString local = destDir + "/" + name;
+        if (node->attr.attributes & FATX_ATTR_DIRECTORY) {
+            if (!QDir().mkpath(local)) return -1;
+            int count = 0;
+            for (auto &child : node->children) {
+                int c = extractNode(fs, static_cast<struct NodeFile *>(child.get()), local);
+                if (c < 0) return -1;
+                count += c;
+            }
+            return count;
+        }
+        QFile out(local);
+        if (!out.open(QIODevice::WriteOnly)) return -1;
+        std::vector<char> buf(1 << 20);
+        uint64_t remaining = node->attr.file_size, off = 0;
+        while (remaining) {
+            size_t chunk = remaining < buf.size() ? remaining : buf.size();
+            int n = fatx_read(fs, node->path.c_str(), off, chunk, buf.data());
+            if (n <= 0) return -1;
+            out.write(buf.data(), n);
+            off += n;
+            remaining -= n;
+        }
+        return 1;
+    }
+
+public:
     void addPartition(std::string name, struct fatx_fs *fs)
     {
         auto node = new NodePartition;
@@ -107,6 +158,8 @@ public:
         node->parent = &m_root;
         node->name = name;
         node->fs = fs;
+        node->bytes_per_cluster = fs->bytes_per_cluster;
+        fatx_get_fs_stat(fs, &node->total_clusters, &node->free_clusters);
         node->rowInParent = m_root.children.size();
         populateFileNodeChildren(fs, node);
         m_root.children.emplace_back(node);
@@ -195,6 +248,14 @@ public:
                     return QString::fromLocal8Bit(static_cast<struct NodeFile *>(node)->attr.filename);
                 }
             } else if (index.column() == 1) {
+                if (node->type == NODETYPE_PARTITION) {
+                    /* used / total, from the FAT - can never go negative */
+                    auto p = static_cast<struct NodePartition *>(node);
+                    double mb = p->bytes_per_cluster / (1024.0 * 1024.0);
+                    return QString("%1 / %2 MiB used")
+                        .arg((p->total_clusters - p->free_clusters) * mb, 0, 'f', 1)
+                        .arg(p->total_clusters * mb, 0, 'f', 1);
+                }
                 if (node->type == NODETYPE_FILE) {
                     auto fsnode = static_cast<struct NodeFile *>(node);
                     if (fsnode->attr.attributes & FATX_ATTR_DIRECTORY) {
