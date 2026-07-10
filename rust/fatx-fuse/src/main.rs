@@ -536,8 +536,54 @@ struct Cli {
 
 /// Probes every known original-Xbox partition offset for the FATX signature.
 /// Returns (letter, offset, size) for each match; size 0 = to end of device.
+
+/// XBpartitioner-style table in sector 0 (issue #75): 16-byte magic
+/// "****PARTINFO****", 32 reserved bytes, then up to 14 entries of
+/// { name[16], flags u32, lba_start u32, lba_size u32, reserved u32 },
+/// little-endian, 512-byte LBAs. Entries map to drive letters by their
+/// start LBA; entries past the retail region are F and G.
+fn probe_xbp_table(device: &str) -> Option<Vec<(&'static str, u64, u64)>> {
+    use std::io::Read;
+    let mut f = std::fs::File::open(device).ok()?;
+    let mut sector = [0u8; 512];
+    f.read_exact(&mut sector).ok()?;
+    if &sector[..16] != b"****PARTINFO****" {
+        return None;
+    }
+    let mut out = Vec::new();
+    let mut f_seen = false;
+    for i in 0..14 {
+        let e = &sector[48 + i * 32..48 + (i + 1) * 32];
+        let flags = u32::from_le_bytes(e[16..20].try_into().unwrap());
+        let lba_start = u32::from_le_bytes(e[20..24].try_into().unwrap());
+        let lba_size = u32::from_le_bytes(e[24..28].try_into().unwrap());
+        if flags & 0x8000_0000 == 0 || lba_size == 0 {
+            continue;
+        }
+        let letter = match lba_start {
+            0x0000_0400 => "x",
+            0x0017_7400 => "y",
+            0x002E_E400 => "z",
+            0x0046_5400 => "c",
+            0x0055_F400 => "e",
+            s if s >= 0x00EE_8AB0 => {
+                if f_seen { "g" } else { f_seen = true; "f" }
+            }
+            _ => continue,
+        };
+        out.push((letter, lba_start as u64 * 512, lba_size as u64 * 512));
+    }
+    Some(out)
+}
+
 fn probe(device: &str) -> std::io::Result<Vec<(&'static str, u64, u64)>> {
     use std::io::{Read, Seek};
+    // A partition table on disk overrides the fixed retail layout.
+    if let Some(parts) = probe_xbp_table(device) {
+        if !parts.is_empty() {
+            return Ok(parts);
+        }
+    }
     let mut f = std::fs::File::open(device)?;
     let mut found = Vec::new();
     for entry in fatx::DEFAULT_PARTITION_LAYOUT {
@@ -590,11 +636,11 @@ fn main() {
         let parts = probe(&cli.device_path).expect("probing device");
         assert!(!parts.is_empty(), "no FATX partitions found");
         let mut sessions = Vec::new();
-        for (letter, _, _) in &parts {
+        for (letter, offset, size) in &parts {
             let dir = std::path::Path::new(&cli.mount_point).join(letter);
             std::fs::create_dir_all(&dir).expect("creating mount subdirectory");
             let config = FatxFsConfig::new(cli.device_path.clone())
-                .drive_letter(letter)
+                .offset_size(*offset, *size)
                 .writable(!cli.read_only);
             let fs = FuseFatxFs {
                 fatx: FatxFs::open_device(&config).expect("opening partition"),
@@ -627,9 +673,22 @@ fn main() {
         options.push(MountOption::AllowRoot);
     }
 
-    let config = FatxFsConfig::new(cli.device_path)
-        .drive_letter(&cli.drive_letter)
-        .writable(!cli.read_only);
+    // Prefer the on-disk partition table entry for the chosen letter (the
+    // only way F/G can have non-default sizes); fall back to the fixed layout.
+    let table_entry = probe_xbp_table(&cli.device_path).and_then(|parts| {
+        parts
+            .iter()
+            .find(|(l, _, _)| *l == cli.drive_letter)
+            .map(|(_, o, s)| (*o, *s))
+    });
+    let config = match table_entry {
+        Some((offset, size)) => {
+            eprintln!("fatx-fuse: using partition table entry for {}", cli.drive_letter);
+            FatxFsConfig::new(cli.device_path.clone()).offset_size(offset, size)
+        }
+        None => FatxFsConfig::new(cli.device_path.clone()).drive_letter(&cli.drive_letter),
+    }
+    .writable(!cli.read_only);
 
     let fs = FuseFatxFs {
         fatx: FatxFs::open_device(&config).unwrap(),

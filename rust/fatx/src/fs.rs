@@ -65,6 +65,14 @@ impl FatxFsConfig {
         }
     }
 
+    /// Overrides the partition location explicitly (e.g. from an on-disk
+    /// XBpartitioner table, which is the only way F/G get custom sizes).
+    pub fn offset_size(mut self, offset_bytes: u64, size_bytes: u64) -> Self {
+        self.partition_offset_bytes = offset_bytes;
+        self.partition_size_bytes = size_bytes;
+        self
+    }
+
     /// Opens the device read-write, enabling the write API.
     pub fn writable(mut self, writable: bool) -> Self {
         self.writable = writable;
