@@ -70,7 +70,11 @@ int fatx_disk_size(char const *path, uint64_t *size)
         return FATX_STATUS_ERROR;
     }
 
-    if (fseek(device, 0, SEEK_END))
+#ifdef _WIN32
+    if (_fseeki64(device, 0, SEEK_END))
+#else
+    if (fseeko(device, 0, SEEK_END))
+#endif
     {
         fprintf(stderr, "failed to seek to end of disk\n");
         retval = FATX_STATUS_ERROR;
@@ -226,7 +230,11 @@ int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint
         return FATX_STATUS_ERROR;
     }
 
-    if (fseek(device, FATX_REFURB_OFFSET, SEEK_CUR))
+#ifdef _WIN32
+    if (_fseeki64(device, FATX_REFURB_OFFSET, SEEK_CUR))
+#else
+    if (fseeko(device, FATX_REFURB_OFFSET, SEEK_CUR))
+#endif
     {
         fprintf(stderr, "failed to seek to the refurb info (offset 0x%x)\n", FATX_REFURB_OFFSET);
         retval = FATX_STATUS_ERROR;

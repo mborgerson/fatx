@@ -69,3 +69,18 @@ gfatx (Qt GUI)
 --------------
 
 See gfatx/README.md; early state, browse-only.
+
+Non-raw disk images (QCOW2, VHD, VMDK)
+--------------------------------------
+
+The tools operate on raw images and block devices. For other formats, expose
+the image as a block device with `qemu-nbd` and point the tools at it
+(covers the use cases of issue #39 without adding format code here):
+
+```sh
+sudo modprobe nbd
+sudo qemu-nbd --connect=/dev/nbd0 disk.qcow2
+./build/fatxfs/fatxfs /dev/nbd0 c --drive=c
+fusermount -u c
+sudo qemu-nbd --disconnect /dev/nbd0
+```
