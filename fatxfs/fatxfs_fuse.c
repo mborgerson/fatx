@@ -800,6 +800,29 @@ int main(int argc, char *argv[])
         goto error_nofs;
     }
 
+    /* Resolve user-supplied paths to absolute ones. After fuse_main() the
+     * process daemonizes and chdir()s to /, so any relative path resolved
+     * past that point silently points elsewhere (issue #64: the mount
+     * "succeeds" but shows an empty directory). The mount point itself is
+     * realpath'd by libfuse; the device and log paths are ours to fix.
+     */
+    {
+        char *abs = realpath(pd.device_path, NULL);
+        if (abs != NULL)
+        {
+            pd.device_path = abs;
+        }
+        if (pd.log_path != NULL)
+        {
+            /* The log file may not exist yet - resolve its directory. */
+            abs = realpath(pd.log_path, NULL);
+            if (abs != NULL)
+            {
+                pd.log_path = abs;
+            }
+        }
+    }
+
     if (pd.mount_partition_offset != -1 || pd.mount_partition_size != -1)
     {
         /* Partition Specified Manually */
@@ -827,16 +850,41 @@ int main(int argc, char *argv[])
         /* Drive Letter Specified */
         if (pd.mount_partition_drive == 0x00)
         {
-            pd.mount_partition_drive = 'c';
+            /* No drive and no offset given: auto-detect a bare FATX image
+             * (Xbox Memory Unit dumps and single-partition images carry the
+             * signature right at offset 0). Falls back to drive C otherwise.
+             * Addresses issue #74.
+             */
+            FILE *probe = fopen(pd.device_path, "rb");
+            char sig[4] = {0};
+            if (probe != NULL)
+            {
+                if (fread(sig, 1, 4, probe) == 4 && memcmp(sig, "FATX", 4) == 0)
+                {
+                    fseek(probe, 0, SEEK_END);
+                    pd.mount_partition_offset = 0;
+                    pd.mount_partition_size   = ftell(probe);
+                    fprintf(stderr, "FATX signature at offset 0: mounting as a bare image/XMU (size 0x%zx)\n",
+                            pd.mount_partition_size);
+                }
+                fclose(probe);
+            }
+            if (pd.mount_partition_offset == -1)
+            {
+                pd.mount_partition_drive = 'c';
+            }
         }
 
-        status = fatx_drive_to_offset_size(pd.mount_partition_drive,
-                                           &pd.mount_partition_offset,
-                                           &pd.mount_partition_size);
-        if (status)
+        if (pd.mount_partition_drive != 0x00)
         {
-            fprintf(stderr, "unknown drive letter '%c'\n", pd.mount_partition_drive);
-            goto error_nofs;
+            status = fatx_drive_to_offset_size(pd.mount_partition_drive,
+                                               &pd.mount_partition_offset,
+                                               &pd.mount_partition_size);
+            if (status)
+            {
+                fprintf(stderr, "unknown drive letter '%c'\n", pd.mount_partition_drive);
+                goto error_nofs;
+            }
         }
     }
 
