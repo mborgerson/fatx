@@ -877,18 +877,38 @@ int main(int argc, char *argv[])
 
         if (pd.mount_partition_drive != 0x00)
         {
-            status = fatx_drive_to_offset_size(pd.mount_partition_drive,
-                                               &pd.mount_partition_offset,
-                                               &pd.mount_partition_size);
-            if (status)
+            /* An XBpartitioner-style table in sector 0 overrides the fixed
+             * retail layout (the only way F/G can have custom sizes) - #75.
+             */
+            status = fatx_disk_read_partition_map(pd.device_path,
+                                                  pd.mount_partition_drive,
+                                                  &pd.mount_partition_offset,
+                                                  &pd.mount_partition_size);
+            if (status == FATX_STATUS_SUCCESS)
             {
-                fprintf(stderr, "unknown drive letter '%c'\n", pd.mount_partition_drive);
-                goto error_nofs;
+                fprintf(stderr, "using partition table entry for drive %c (offset=0x%zx size=0x%zx)\n",
+                        pd.mount_partition_drive,
+                        pd.mount_partition_offset, pd.mount_partition_size);
+            }
+            else
+            {
+                status = fatx_drive_to_offset_size(pd.mount_partition_drive,
+                                                   &pd.mount_partition_offset,
+                                                   &pd.mount_partition_size);
+                if (status)
+                {
+                    fprintf(stderr, "unknown drive letter '%c'\n", pd.mount_partition_drive);
+                    goto error_nofs;
+                }
             }
         }
     }
 
-    pd.fs = malloc(sizeof(struct fatx_fs));
+    /* calloc, not malloc: fatx_log() dereferences fs->log_handle, which is
+     * only assigned when --log is given. With malloc the handle is whatever
+     * happens to be on the heap and the first debug print crashes.
+     */
+    pd.fs = calloc(1, sizeof(struct fatx_fs));
     if (pd.fs == NULL)
     {
         fprintf(stderr, "no memory\n");
