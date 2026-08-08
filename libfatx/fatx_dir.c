@@ -102,14 +102,27 @@ int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir)
                 goto continue_to_next_entry;
             }
 
-            /* Trim trailing slash, if present. */
+            /*
+             * Intermediate components include the trailing path separator.
+             * Compare them by their actual name length without modifying len,
+             * because len must remain unchanged while scanning sibling entries.
+             *
+             * Final components include their terminating NUL and therefore
+             * already compare exactly via memcmp().
+             */
+            size_t compare_len = len;
             if (start[len-1] == FATX_PATH_SEPERATOR)
             {
-                len -= 1;
+                compare_len -= 1;
+
+                if (strlen(dirent.filename) != compare_len)
+                {
+                    goto continue_to_next_entry;
+                }
             }
 
             /* Compare the path component to this directory entry. */
-            if (memcmp(dirent.filename, start, len) == 0)
+            if (memcmp(dirent.filename, start, compare_len) == 0)
             {
                 /* Path found. */
                 dir->cluster = attr.first_cluster;
