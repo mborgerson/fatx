@@ -21,6 +21,7 @@
 #define FATX_INTERNAL_H
 
 #include "fatx.h"
+#include "fatx_endian.h"
 
 /* FATX refurb info signature ('RFRB') */
 #define FATX_REFURB_SIGNATURE        0x42524652

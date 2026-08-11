@@ -25,6 +25,10 @@
 
 /*
  * Check partition signature.
+ *
+ * When the variant is FATX_VARIANT_AUTO this also determines it: the raw
+ * signature word identifies the on-disk byte order, so a successful check
+ * leaves fs->variant resolved to a concrete variant.
  */
 int fatx_check_partition_signature(struct fatx_fs *fs)
 {
@@ -42,9 +46,26 @@ int fatx_check_partition_signature(struct fatx_fs *fs)
         return FATX_STATUS_ERROR;
     }
 
-    if (signature != FATX_SIGNATURE)
+    if (fs->variant == FATX_VARIANT_AUTO)
     {
-        fatx_error(fs, "invalid signature\n");
+        enum fatx_variant detected;
+
+        detected = fatx_variant_from_raw_signature(signature, FATX_SIGNATURE);
+        if (detected == FATX_VARIANT_AUTO)
+        {
+            fatx_error(fs, "invalid signature (got %.8x, expected %.8x in either byte order)\n",
+                       signature, FATX_SIGNATURE);
+            return FATX_STATUS_ERROR;
+        }
+
+        fs->variant = detected;
+        fatx_info(fs, "detected %s filesystem\n", fatx_variant_name(fs->variant));
+        return FATX_STATUS_SUCCESS;
+    }
+
+    if (fatx_from_disk_u32(fs, signature) != FATX_SIGNATURE)
+    {
+        fatx_error(fs, "invalid signature for %s filesystem\n", fatx_variant_name(fs->variant));
         return FATX_STATUS_ERROR;
     }
 
@@ -72,6 +93,23 @@ int fatx_init_superblock(struct fatx_fs *fs, size_t sectors_per_cluster)
     /* Initialize device with a new FATX superblock. */
     else
     {
+        /*
+         * There is no signature to probe when formatting. Formatting a 360
+         * partition is not supported yet, so an unresolved variant means the
+         * original Xbox.
+         */
+        if (fs->variant == FATX_VARIANT_AUTO)
+        {
+            fs->variant = FATX_VARIANT_XBOX;
+        }
+
+        if (fs->variant != FATX_VARIANT_XBOX)
+        {
+            fatx_error(fs, "formatting a %s filesystem is not supported\n",
+                       fatx_variant_name(fs->variant));
+            return FATX_STATUS_ERROR;
+        }
+
 #ifdef _WIN32
         fs->volume_id = 12345678;
 #else
@@ -104,15 +142,15 @@ int fatx_read_superblock(struct fatx_fs *fs)
         return FATX_STATUS_ERROR;
     }
 
-    if (superblock.signature != FATX_SIGNATURE)
+    if (fatx_from_disk_u32(fs, superblock.signature) != FATX_SIGNATURE)
     {
         fatx_error(fs, "invalid signature\n");
         return FATX_STATUS_ERROR;
     }
 
-    fs->volume_id = superblock.volume_id;
-    fs->sectors_per_cluster = superblock.sectors_per_cluster;
-    fs->root_cluster = superblock.root_cluster;
+    fs->volume_id = fatx_from_disk_u32(fs, superblock.volume_id);
+    fs->sectors_per_cluster = fatx_from_disk_u32(fs, superblock.sectors_per_cluster);
+    fs->root_cluster = fatx_from_disk_u32(fs, superblock.root_cluster);
 
     return FATX_STATUS_SUCCESS;
 }
@@ -132,11 +170,11 @@ int fatx_write_superblock(struct fatx_fs *fs)
 
     memset(&superblock, 0xFF, sizeof(struct fatx_superblock));
 
-    superblock.signature = FATX_SIGNATURE;
-    superblock.sectors_per_cluster = fs->sectors_per_cluster;
-    superblock.volume_id = fs->volume_id;
-    superblock.root_cluster = fs->root_cluster;
-    superblock.unknown1 = 0;
+    superblock.signature = fatx_to_disk_u32(fs, FATX_SIGNATURE);
+    superblock.sectors_per_cluster = fatx_to_disk_u32(fs, fs->sectors_per_cluster);
+    superblock.volume_id = fatx_to_disk_u32(fs, fs->volume_id);
+    superblock.root_cluster = fatx_to_disk_u32(fs, fs->root_cluster);
+    superblock.unknown1 = fatx_to_disk_u16(fs, 0);
 
     if (fatx_dev_write(fs, &superblock, sizeof(struct fatx_superblock), 1) != 1)
     {

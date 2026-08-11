@@ -220,7 +220,7 @@ int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *
         return FATX_STATUS_FILE_DELETED;
     }
 
-    fatx_debug(fs, "dirent %zd of cluster %zd data starts at %08x\n", dir->entry, dir->cluster, directory_entry.first_cluster);
+    fatx_debug(fs, "dirent %zd of cluster %zd data starts at %08x\n", dir->entry, dir->cluster, fatx_from_disk_u32(fs, directory_entry.first_cluster));
 
     /* Copy filename. */
     memcpy(entry->filename, directory_entry.filename, directory_entry.filename_len);
@@ -280,14 +280,14 @@ int fatx_write_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent 
     fatx_debug(fs, "\tfilename_len: \t0x%x\n", directory_entry.filename_len);
     fatx_debug(fs, "\tattributes: \t0x%x\n", directory_entry.attributes);
     fatx_debug(fs, "\tfilename: \t%s\n", entry->filename);
-    fatx_debug(fs, "\tfirst_cluster: \t0x%x\n", directory_entry.first_cluster);
-    fatx_debug(fs, "\tfile_size: \t0x%x\n", directory_entry.file_size);
-    fatx_debug(fs, "\tmodified_time: \t0x%x\n", directory_entry.modified_time);
-    fatx_debug(fs, "\tmodified_date: \t0x%x\n", directory_entry.modified_date);
-    fatx_debug(fs, "\tcreated_time: \t0x%x\n", directory_entry.created_time);
-    fatx_debug(fs, "\tcreated_date: \t0x%x\n", directory_entry.created_date);
-    fatx_debug(fs, "\taccessed_time: \t0x%x\n", directory_entry.accessed_time);
-    fatx_debug(fs, "\taccessed_date: \t0x%x\n", directory_entry.accessed_date);
+    fatx_debug(fs, "\tfirst_cluster: \t0x%x\n", fatx_from_disk_u32(fs, directory_entry.first_cluster));
+    fatx_debug(fs, "\tfile_size: \t0x%x\n", fatx_from_disk_u32(fs, directory_entry.file_size));
+    fatx_debug(fs, "\tmodified_time: \t0x%x\n", fatx_from_disk_u16(fs, directory_entry.modified_time));
+    fatx_debug(fs, "\tmodified_date: \t0x%x\n", fatx_from_disk_u16(fs, directory_entry.modified_date));
+    fatx_debug(fs, "\tcreated_time: \t0x%x\n", fatx_from_disk_u16(fs, directory_entry.created_time));
+    fatx_debug(fs, "\tcreated_date: \t0x%x\n", fatx_from_disk_u16(fs, directory_entry.created_date));
+    fatx_debug(fs, "\taccessed_time: \t0x%x\n", fatx_from_disk_u16(fs, directory_entry.accessed_time));
+    fatx_debug(fs, "\taccessed_date: \t0x%x\n", fatx_from_disk_u16(fs, directory_entry.accessed_date));
     fatx_debug(fs, "}\n");
 
     /* Write out the raw directory entry. */

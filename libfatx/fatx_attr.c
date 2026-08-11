@@ -29,15 +29,15 @@ int fatx_dirent_to_attr(struct fatx_fs *fs, struct fatx_raw_directory_entry *ent
     attr->filename[entry->filename_len] = '\0';
 
     attr->attributes    = entry->attributes;
-    attr->first_cluster = entry->first_cluster;
-    attr->file_size     = entry->file_size;
+    attr->first_cluster = fatx_from_disk_u32(fs, entry->first_cluster);
+    attr->file_size     = fatx_from_disk_u32(fs, entry->file_size);
 
-    fatx_unpack_date(entry->modified_date, &(attr->modified));
-    fatx_unpack_time(entry->modified_time, &(attr->modified));
-    fatx_unpack_date(entry->created_date,  &(attr->created));
-    fatx_unpack_time(entry->created_time,  &(attr->created));
-    fatx_unpack_date(entry->accessed_date, &(attr->accessed));
-    fatx_unpack_time(entry->accessed_time, &(attr->accessed));
+    fatx_unpack_date(fatx_from_disk_u16(fs, entry->modified_date), &(attr->modified));
+    fatx_unpack_time(fatx_from_disk_u16(fs, entry->modified_time), &(attr->modified));
+    fatx_unpack_date(fatx_from_disk_u16(fs, entry->created_date),  &(attr->created));
+    fatx_unpack_time(fatx_from_disk_u16(fs, entry->created_time),  &(attr->created));
+    fatx_unpack_date(fatx_from_disk_u16(fs, entry->accessed_date), &(attr->accessed));
+    fatx_unpack_time(fatx_from_disk_u16(fs, entry->accessed_time), &(attr->accessed));
 
     return FATX_STATUS_SUCCESS;
 }
@@ -48,19 +48,34 @@ int fatx_dirent_to_attr(struct fatx_fs *fs, struct fatx_raw_directory_entry *ent
 int fatx_attr_to_dirent(struct fatx_fs *fs, struct fatx_attr *attr, struct fatx_raw_directory_entry *entry)
 {
     size_t filename_len = strlen(attr->filename);
+    uint16_t date, time;
+
     entry->filename_len = filename_len;
     memcpy(entry->filename, attr->filename, filename_len);
 
     entry->attributes    = attr->attributes;
-    entry->first_cluster = attr->first_cluster;
-    entry->file_size     = attr->file_size;
+    entry->first_cluster = fatx_to_disk_u32(fs, attr->first_cluster);
+    entry->file_size     = fatx_to_disk_u32(fs, attr->file_size);
 
-    fatx_pack_date(&(attr->modified), &(entry->modified_date));
-    fatx_pack_time(&(attr->modified), &(entry->modified_time));
-    fatx_pack_date(&(attr->created),  &(entry->created_date));
-    fatx_pack_time(&(attr->created),  &(entry->created_time));
-    fatx_pack_date(&(attr->accessed), &(entry->accessed_date));
-    fatx_pack_time(&(attr->accessed), &(entry->accessed_time));
+    /*
+     * Pack into locals rather than straight into the packed on-disk struct, so
+     * the value can be byte-swapped on the way in (and so the packers are not
+     * handed a potentially unaligned pointer).
+     */
+    fatx_pack_date(&(attr->modified), &date);
+    fatx_pack_time(&(attr->modified), &time);
+    entry->modified_date = fatx_to_disk_u16(fs, date);
+    entry->modified_time = fatx_to_disk_u16(fs, time);
+
+    fatx_pack_date(&(attr->created), &date);
+    fatx_pack_time(&(attr->created), &time);
+    entry->created_date = fatx_to_disk_u16(fs, date);
+    entry->created_time = fatx_to_disk_u16(fs, time);
+
+    fatx_pack_date(&(attr->accessed), &date);
+    fatx_pack_time(&(attr->accessed), &time);
+    entry->accessed_date = fatx_to_disk_u16(fs, date);
+    entry->accessed_time = fatx_to_disk_u16(fs, time);
 
     return FATX_STATUS_SUCCESS;
 }
