@@ -267,6 +267,7 @@ int fatx_write_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent 
 
     /* Construct the raw directory entry */
     size_t filename_len = strlen(entry->filename);
+    memset(&directory_entry, 0xFF, sizeof(directory_entry));
     memcpy(directory_entry.filename, entry->filename, filename_len);
 
     status = fatx_attr_to_dirent(fs, attr, &directory_entry);

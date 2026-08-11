@@ -52,6 +52,8 @@ int fatx_attr_to_dirent(struct fatx_fs *fs, struct fatx_attr *attr, struct fatx_
 
     entry->filename_len = filename_len;
     memcpy(entry->filename, attr->filename, filename_len);
+    /* Pad the unused tail, so stack contents are not written out to disk. */
+    memset(entry->filename + filename_len, 0xFF, sizeof(entry->filename) - filename_len);
 
     entry->attributes    = attr->attributes;
     entry->first_cluster = fatx_to_disk_u32(fs, attr->first_cluster);
