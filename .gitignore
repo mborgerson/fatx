@@ -4,3 +4,4 @@ install/
 __pycache__/
 *.pyc
 venv/
+gate-results/

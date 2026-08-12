@@ -92,7 +92,7 @@ note "4. file contents must match their own format's magic"
 # These magic numbers are defined by Microsoft and by the image formats, not by
 # this project, so they are ground truth from outside the codebase. A FAT chain
 # that is followed incorrectly cannot land on the right magic by luck.
-python3 - "$MNT" "$OUT/listing.txt" <<'PY'
+if ! python3 - "$MNT" "$OUT/listing.txt" <<'PY'
 import os, struct, sys
 
 mnt, listing = sys.argv[1], sys.argv[2]
@@ -144,17 +144,23 @@ elif mismatched:
 else:
     print(f"   ok: {matched}/{checked} files match their format's magic")
 PY
-[ $? -eq 0 ] || fail=1
+then
+    fail=1
+fi
 
 note "5. STFS packages must be internally consistent"
-# An STFS header stores the display name as UTF-16BE at a fixed offset. Getting
-# readable text out of it means the cluster chain landed exactly right, not
-# merely on a plausible-looking first sector.
-python3 - "$MNT" "$OUT/listing.txt" <<'PY'
-import os, sys
+# An STFS header stores the display name as UTF-16BE at 0x411 -- but only for
+# content types that actually carry one. Saved Game (0x1), Profile (0x10000)
+# and Cache File (0x40000) packages leave that field blank or reuse it for
+# something else, confirmed on real drive data: unrelated saves across
+# different games decode to byte-identical bytes at 0x411, which a misread
+# FAT chain could not produce. So those types are skipped, not required.
+if ! python3 - "$MNT" "$OUT/listing.txt" <<'PY'
+import os, struct, sys
 
 mnt, listing = sys.argv[1], sys.argv[2]
-ok = bad = 0
+NO_DISPLAY_NAME = {0x00000001, 0x00010000, 0x00040000}
+ok = bad = skipped = 0
 samples = []
 
 with open(listing) as f:
@@ -169,6 +175,10 @@ with open(listing) as f:
             continue
         if not head[:4] in (b"CON ", b"LIVE", b"PIRS"):
             continue
+        content_type = struct.unpack(">I", head[0x344:0x348])[0]
+        if content_type in NO_DISPLAY_NAME:
+            skipped += 1
+            continue
         # Display name: UTF-16BE at 0x411 in the STFS metadata.
         raw = head[0x411:0x411 + 0x80]
         name = raw.decode("utf-16-be", "replace").split("\x00")[0].strip()
@@ -178,18 +188,23 @@ with open(listing) as f:
                 samples.append((name, rel))
         else:
             bad += 1
+            print(f"   UNREADABLE: {rel} (content type 0x{content_type:08x})")
 
 for name, rel in samples:
     print(f'   "{name}"')
+if skipped:
+    print(f"   ({skipped} save/profile/cache package(s) skipped -- no display name field)")
 if ok == 0 and bad == 0:
-    print("   (no STFS packages on this partition)")
+    print("   (no title-carrying STFS packages on this partition)")
 elif bad:
     print(f"   FAILED: {bad} package(s) had unreadable display names ({ok} ok)")
     sys.exit(1)
 else:
     print(f"   ok: {ok} STFS package(s) with readable display names")
 PY
-[ $? -eq 0 ] || fail=1
+then
+    fail=1
+fi
 
 note "6. cross-check against the independent Rust implementation"
 if [ -x "$FATXFUSE" ]; then
