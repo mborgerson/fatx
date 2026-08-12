@@ -53,6 +53,7 @@ impl InodeTracker {
 }
 
 struct FuseFatxFs {
+    variant: fatx::Variant,
     fatx: FatxFsHandle,
     inodes: InodeTracker,
 }
@@ -85,10 +86,10 @@ impl FuseFatxFs {
                 ino: inode,
                 size: 0,
                 blocks: 0,
-                atime: fatx_datetime_to_systemtime(dirent.accessed()),
-                mtime: fatx_datetime_to_systemtime(dirent.modified()),
-                ctime: fatx_datetime_to_systemtime(dirent.modified()),
-                crtime: fatx_datetime_to_systemtime(dirent.created()),
+                atime: fatx_datetime_to_systemtime(dirent.accessed(self.variant)),
+                mtime: fatx_datetime_to_systemtime(dirent.modified(self.variant)),
+                ctime: fatx_datetime_to_systemtime(dirent.modified(self.variant)),
+                crtime: fatx_datetime_to_systemtime(dirent.created(self.variant)),
                 kind: FileType::Directory,
                 perm: 0o755,
                 nlink: 2,
@@ -105,10 +106,10 @@ impl FuseFatxFs {
                 ino: inode,
                 size: dirent.file_size() as u64,
                 blocks: (dirent.file_size() / 512) as u64, // FIXME: num clusters?
-                atime: fatx_datetime_to_systemtime(dirent.accessed()),
-                mtime: fatx_datetime_to_systemtime(dirent.modified()),
-                ctime: fatx_datetime_to_systemtime(dirent.modified()),
-                crtime: fatx_datetime_to_systemtime(dirent.created()),
+                atime: fatx_datetime_to_systemtime(dirent.accessed(self.variant)),
+                mtime: fatx_datetime_to_systemtime(dirent.modified(self.variant)),
+                ctime: fatx_datetime_to_systemtime(dirent.modified(self.variant)),
+                crtime: fatx_datetime_to_systemtime(dirent.created(self.variant)),
                 kind: FileType::RegularFile,
                 perm: 0o644, // FIXME
                 nlink: 1,
@@ -274,9 +275,28 @@ struct Cli {
     #[arg()]
     mount_point: String,
 
-    /// Drive letter of c|e|x|y|z
+    /// Drive letter of c|e|x|y|z|f (original Xbox)
     #[arg(short, long, default_value_t = String::from("c"))]
     drive_letter: String,
+
+    /// On-disk byte order: auto, xbox or x360
+    #[arg(long, default_value_t = String::from("auto"))]
+    variant: String,
+
+    /// Xbox 360 partition to mount: sysext, sysext2, compat or data
+    #[arg(long)]
+    partition: Option<String>,
+
+    /// Partition offset in bytes, for images that do not start at a known one
+    #[arg(long)]
+    offset: Option<u64>,
+
+    /// Partition size in bytes. Required with --offset. Note that this is the
+    /// size of the partition on the original disk, which for a truncated dump
+    /// is not the size of the file: the FAT and cluster geometry are derived
+    /// from it, so a wrong value misplaces every data cluster.
+    #[arg(long)]
+    size: Option<u64>,
 
     /// Auto-unmount
     #[arg(long)]
@@ -298,10 +318,36 @@ fn main() {
         options.push(MountOption::AllowRoot);
     }
 
-    let config = FatxFsConfig::new(cli.device_path).drive_letter(&cli.drive_letter);
+    let variant: fatx::Variant = cli.variant.parse().unwrap_or_else(|e| {
+        eprintln!("{e}");
+        std::process::exit(1);
+    });
 
+    // An Xbox 360 disk has no drive letters, so default it to user content
+    // rather than to the original Xbox's 'c'.
+    let partition = match (&cli.partition, variant) {
+        (Some(name), _) => Some(name.clone()),
+        (None, fatx::Variant::X360) => Some(String::from("data")),
+        _ => None,
+    };
+
+    let mut config = FatxFsConfig::new(cli.device_path).variant(variant);
+    config = match (cli.offset, cli.size, &partition) {
+        (Some(offset), Some(size), _) => config
+            .partition_offset_bytes(offset)
+            .partition_size_bytes(size),
+        (Some(_), None, _) | (None, Some(_), _) => {
+            eprintln!("--offset and --size must be given together");
+            std::process::exit(1);
+        }
+        (None, None, Some(name)) => config.x360_partition(name),
+        (None, None, None) => config.drive_letter(&cli.drive_letter),
+    };
+
+    let fatx = FatxFs::open_device(&config).unwrap();
     let fs = FuseFatxFs {
-        fatx: FatxFs::open_device(&config).unwrap(),
+        variant: fatx.variant(),
+        fatx,
         inodes: InodeTracker::new(),
     };
     fuser::mount2(fs, cli.mount_point, &options).unwrap();

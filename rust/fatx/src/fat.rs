@@ -2,6 +2,7 @@ use zerocopy::byteorder::little_endian::{U16, U32};
 use zerocopy::*;
 
 use crate::error::Error;
+use crate::variant::Variant;
 
 #[derive(Debug)]
 enum FatType {
@@ -82,7 +83,12 @@ impl Fat {
         }
     }
 
-    pub(crate) fn entry(&mut self, index: FatEntryId) -> Result<FatEntry, Error> {
+    /// Read a FAT entry.
+    ///
+    /// The cached FAT is held in on-disk byte order, so entries are swapped
+    /// here as they are read out rather than when the cache is filled.
+    pub(crate) fn entry(&mut self, index: FatEntryId, variant: Variant) -> Result<FatEntry, Error> {
+        let swap = variant.needs_swap();
         match self.fat_type {
             FatType::Type16 => {
                 let fat = <[U16]>::ref_from_bytes_with_elems(
@@ -91,6 +97,7 @@ impl Fat {
                 )
                 .unwrap();
                 let value: u16 = fat[index as usize].into();
+                let value = if swap { value.swap_bytes() } else { value };
                 Ok(value.into())
             }
             FatType::Type32 => {
@@ -100,6 +107,7 @@ impl Fat {
                 )
                 .unwrap();
                 let value: u32 = fat[index as usize].into();
+                let value = if swap { value.swap_bytes() } else { value };
                 Ok(value.into())
             }
         }

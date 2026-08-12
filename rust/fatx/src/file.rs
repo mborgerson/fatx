@@ -88,10 +88,12 @@ impl io::Read for File {
 
                 // Scan through the cluster chain
                 for _ in self.cur_cluster_relative..tar_cluster_relative {
-                    self.cur_cluster_absolute = match fs.fat.entry(self.cur_cluster_absolute)? {
-                        FatEntry::Data(cluster) => cluster,
-                        _ => return Err(io::Error::other("Corrupt FAT chain")),
-                    };
+                    let variant = fs.variant;
+                    self.cur_cluster_absolute =
+                        match fs.fat.entry(self.cur_cluster_absolute, variant)? {
+                            FatEntry::Data(cluster) => cluster,
+                            _ => return Err(io::Error::other("Corrupt FAT chain")),
+                        };
                 }
                 self.cur_cluster_relative = tar_cluster_relative;
 

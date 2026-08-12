@@ -1,5 +1,7 @@
 use std::path::{Component, Path};
 
+use crate::variant::Variant;
+
 use zerocopy::byteorder::little_endian::{U16, U32};
 use zerocopy::*;
 
@@ -160,20 +162,57 @@ impl DirectoryEntry {
         self.attributes & FATX_ATTR_SYSTEM == FATX_ATTR_SYSTEM
     }
 
-    pub fn created(&self) -> DateTime {
-        DateTime::from_fatx_encoding(self.created_date.into(), self.created_time.into())
+    pub fn created(&self, variant: Variant) -> DateTime {
+        DateTime::from_fatx_encoding(self.created_date.into(), self.created_time.into(), variant)
     }
 
-    pub fn modified(&self) -> DateTime {
-        DateTime::from_fatx_encoding(self.modified_date.into(), self.modified_time.into())
+    pub fn modified(&self, variant: Variant) -> DateTime {
+        DateTime::from_fatx_encoding(
+            self.modified_date.into(),
+            self.modified_time.into(),
+            variant,
+        )
     }
 
-    pub fn accessed(&self) -> DateTime {
-        DateTime::from_fatx_encoding(self.accessed_date.into(), self.accessed_time.into())
+    pub fn accessed(&self, variant: Variant) -> DateTime {
+        DateTime::from_fatx_encoding(
+            self.accessed_date.into(),
+            self.accessed_time.into(),
+            variant,
+        )
     }
 
     pub(crate) fn first_cluster(&self) -> ClusterId {
         self.first_cluster.into()
+    }
+
+    /// Convert this entry from on-disk form into the canonical little-endian,
+    /// time-then-date layout the accessors above expect.
+    ///
+    /// Must be called on every entry read from a device. For the original Xbox
+    /// it does nothing. For the 360 it swaps each multi-byte field, and swaps
+    /// the two halves of each timestamp: the 360 stores the date first, so the
+    /// field named modified_time holds the date on that console.
+    pub(crate) fn normalize(&mut self, variant: Variant) {
+        if !variant.needs_swap() {
+            return;
+        }
+
+        self.first_cluster = u32::from(self.first_cluster).swap_bytes().into();
+        self.file_size = u32::from(self.file_size).swap_bytes().into();
+
+        // Each pair arrives as (date, time) and must end up as (time, date),
+        // with both halves byte-swapped.
+        fn swap_pair(slot0: &mut U16, slot1: &mut U16) {
+            let date = u16::from(*slot0).swap_bytes();
+            let time = u16::from(*slot1).swap_bytes();
+            *slot0 = time.into();
+            *slot1 = date.into();
+        }
+
+        swap_pair(&mut self.modified_time, &mut self.modified_date);
+        swap_pair(&mut self.created_time, &mut self.created_date);
+        swap_pair(&mut self.accessed_time, &mut self.accessed_date);
     }
 }
 
@@ -201,7 +240,7 @@ impl DirectoryEntryIterator {
 
         if (self.entry >= 0) && (self.entry as u64 >= fs.num_entries_per_cluster) {
             // Advance to next cluster
-            let fat_entry = fs.fat.entry(self.cluster);
+            let fat_entry = fs.fat.entry(self.cluster, fs.variant);
             match fat_entry {
                 Err(err) => {
                     self.finished = true;
@@ -231,7 +270,8 @@ impl DirectoryEntryIterator {
                 self.finished = true;
                 Some(Err(err.into()))
             }
-            Ok(entry) => {
+            Ok(mut entry) => {
+                entry.normalize(fs.variant);
                 if entry.kind() == DirectoryEntryKind::EndOfDirectory {
                     self.finished = true;
                 }
