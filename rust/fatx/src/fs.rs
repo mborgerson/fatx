@@ -201,7 +201,7 @@ impl FatxFs {
                 device_handle,
                 variant,
                 partition_offset_bytes: config.partition_offset_bytes,
-                partition_size_bytes: partition_size_bytes,
+                partition_size_bytes,
                 num_clusters,
                 num_bytes_per_cluster,
                 num_entries_per_cluster,
