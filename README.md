@@ -12,6 +12,12 @@ There is work-in-progress towards a Rust implementation:
 * [**fatx**](rust/fatx/README.md) is a Rust crate for working with the FATX filesystem, like libfatx.
 * [**fatx-fuse**](rust/fatx-fuse/README.md) is a Rust crate providing a FUSE driver based on fuser and fatx.
 
+Xbox 360 Support
+-----------------
+This adds full read/write support for the Xbox 360's FATX filesystem to libfatx, fatxfs, pyfatx, and the Rust implementation. The 360 uses the same on-disk format as the original Xbox but differs in four ways — byte order (big-endian vs. little-endian), timestamp epoch, timestamp field widths, and date/time field ordering — all of which are now handled automatically via variant auto-detection. Original Xbox support is unchanged and remains fully compatible.
+
+The write path has been verified end-to-end against real Xbox 360 hardware.
+
 License
 -------
 See LICENSE.txt
