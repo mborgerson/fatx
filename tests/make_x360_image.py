@@ -51,11 +51,16 @@ END_OF_DIR_MARKER = 0xFF
 FAT16_END_OF_CHAIN = 0xFFFF
 FAT16_MEDIA = 0xFFF8
 
-# Timestamp fields are packed with the original Xbox epoch (2000). Whether the
-# 360 uses 1980 instead is an open question that only a real disk can settle, so
-# the accompanying test asserts on names, sizes and contents and treats
-# timestamps as informational.
-EPOCH = 2000
+# Timestamps. All three of these differ from the original Xbox, and all three
+# were established from a retail 360 disk:
+#   - the epoch is 1980, not 2000 (factory files are stamped 2005-11-22, the
+#     console's launch date, which only decodes correctly from a 1980 base);
+#   - the time field uses the standard FAT widths of 5 bits for the hour and 6
+#     for the minute, not the original Xbox's 4 and 5 (a real disk carries
+#     hours of 21 and 23 and minutes of 50 and 59);
+#   - the date is stored BEFORE the time in each pair, the opposite of the
+#     original Xbox.
+EPOCH = 1980
 
 
 def pack_date(year, month, day):
@@ -63,11 +68,14 @@ def pack_date(year, month, day):
 
 
 def pack_time(hour, minute, second):
-    return (((hour & 0xF) << 11) | ((minute & 0x1F) << 5) | ((second // 2) & 0x1F))
+    return (((hour & 0x1F) << 11) | ((minute & 0x3F) << 5) | ((second // 2) & 0x1F))
 
 
-DATE = pack_date(2026, 8, 11)
-TIME = pack_time(14, 30, 0)
+# Deliberately uses an hour and a minute that do not fit the original Xbox's
+# narrower fields, so a regression to those widths cannot pass unnoticed.
+STAMP = (2026, 8, 11, 23, 50, 30)
+DATE = pack_date(*STAMP[:3])
+TIME = pack_time(*STAMP[3:])
 
 
 def superblock():
@@ -94,9 +102,9 @@ def dirent(name, attributes, first_cluster, file_size):
         ">IIHHHHHH",
         first_cluster,
         file_size,
-        TIME, DATE,   # modified
-        TIME, DATE,   # created
-        TIME, DATE,   # accessed
+        DATE, TIME,   # modified -- date first, unlike the original Xbox
+        DATE, TIME,   # created
+        DATE, TIME,   # accessed
     )
     assert len(entry) == DIRENT_SIZE, len(entry)
     return entry

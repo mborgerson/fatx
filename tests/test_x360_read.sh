@@ -70,6 +70,17 @@ if actual != expected:
 EOF
 echo "ok: both files read back byte-exact"
 
+echo
+echo "== 3b. timestamps should decode with the 360's own rules =="
+# 2026-08-11 23:50:30. The hour and minute are chosen so that the original
+# Xbox's narrower fields would mangle them into 07:18 rather than 23:50.
+STAMP="$(date -d @"$(stat -c %Y "$MNT/HELLO.TXT")" '+%Y-%m-%d %H:%M:%S')"
+[ "$STAMP" = "2026-08-11 23:50:30" ] \
+    || fail "timestamp is $STAMP, expected 2026-08-11 23:50:30
+(2046-* means the epoch reverted to 2000; *07:18* means the time field
+reverted to the original Xbox's 4-bit hour and 5-bit minute)"
+echo "ok: $STAMP"
+
 fusermount -u "$MNT"
 
 echo

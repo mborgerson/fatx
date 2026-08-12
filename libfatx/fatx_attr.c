@@ -21,6 +21,60 @@
 #include <stdlib.h>
 
 /*
+ * Read one on-disk timestamp pair.
+ *
+ * slot0 and slot1 are the two 16-bit halves in the order they appear on disk.
+ * The original Xbox stores time then date; the Xbox 360 stores date then time.
+ */
+static void fatx_unpack_timestamp(struct fatx_fs *fs, uint16_t slot0, uint16_t slot1, struct fatx_ts *out)
+{
+    uint16_t date, time;
+
+    if (fs->variant == FATX_VARIANT_X360)
+    {
+        date = slot0;
+        time = slot1;
+    }
+    else
+    {
+        time = slot0;
+        date = slot1;
+    }
+
+    fatx_unpack_date(fs, fatx_from_disk_u16(fs, date), out);
+    fatx_unpack_time(fs, fatx_from_disk_u16(fs, time), out);
+}
+
+/*
+ * Write one on-disk timestamp pair, in this filesystem's slot order.
+ *
+ * Packing goes through locals rather than straight into the packed on-disk
+ * struct so the values can be byte-swapped on the way in, and so the packers
+ * are never handed a potentially unaligned pointer.
+ */
+static void fatx_pack_timestamp(struct fatx_fs *fs, struct fatx_ts *in, uint16_t *slot0, uint16_t *slot1)
+{
+    uint16_t date, time;
+
+    fatx_pack_date(fs, in, &date);
+    fatx_pack_time(fs, in, &time);
+
+    date = fatx_to_disk_u16(fs, date);
+    time = fatx_to_disk_u16(fs, time);
+
+    if (fs->variant == FATX_VARIANT_X360)
+    {
+        *slot0 = date;
+        *slot1 = time;
+    }
+    else
+    {
+        *slot0 = time;
+        *slot1 = date;
+    }
+}
+
+/*
  * Populate a fatx_attr struct given a low-level directory entry.
  */
 int fatx_dirent_to_attr(struct fatx_fs *fs, struct fatx_raw_directory_entry *entry, struct fatx_attr *attr)
@@ -32,12 +86,9 @@ int fatx_dirent_to_attr(struct fatx_fs *fs, struct fatx_raw_directory_entry *ent
     attr->first_cluster = fatx_from_disk_u32(fs, entry->first_cluster);
     attr->file_size     = fatx_from_disk_u32(fs, entry->file_size);
 
-    fatx_unpack_date(fatx_from_disk_u16(fs, entry->modified_date), &(attr->modified));
-    fatx_unpack_time(fatx_from_disk_u16(fs, entry->modified_time), &(attr->modified));
-    fatx_unpack_date(fatx_from_disk_u16(fs, entry->created_date),  &(attr->created));
-    fatx_unpack_time(fatx_from_disk_u16(fs, entry->created_time),  &(attr->created));
-    fatx_unpack_date(fatx_from_disk_u16(fs, entry->accessed_date), &(attr->accessed));
-    fatx_unpack_time(fatx_from_disk_u16(fs, entry->accessed_time), &(attr->accessed));
+    fatx_unpack_timestamp(fs, entry->modified_time, entry->modified_date, &(attr->modified));
+    fatx_unpack_timestamp(fs, entry->created_time,  entry->created_date,  &(attr->created));
+    fatx_unpack_timestamp(fs, entry->accessed_time, entry->accessed_date, &(attr->accessed));
 
     return FATX_STATUS_SUCCESS;
 }
@@ -48,7 +99,6 @@ int fatx_dirent_to_attr(struct fatx_fs *fs, struct fatx_raw_directory_entry *ent
 int fatx_attr_to_dirent(struct fatx_fs *fs, struct fatx_attr *attr, struct fatx_raw_directory_entry *entry)
 {
     size_t filename_len = strlen(attr->filename);
-    uint16_t date, time;
 
     entry->filename_len = filename_len;
     memcpy(entry->filename, attr->filename, filename_len);
@@ -59,25 +109,9 @@ int fatx_attr_to_dirent(struct fatx_fs *fs, struct fatx_attr *attr, struct fatx_
     entry->first_cluster = fatx_to_disk_u32(fs, attr->first_cluster);
     entry->file_size     = fatx_to_disk_u32(fs, attr->file_size);
 
-    /*
-     * Pack into locals rather than straight into the packed on-disk struct, so
-     * the value can be byte-swapped on the way in (and so the packers are not
-     * handed a potentially unaligned pointer).
-     */
-    fatx_pack_date(&(attr->modified), &date);
-    fatx_pack_time(&(attr->modified), &time);
-    entry->modified_date = fatx_to_disk_u16(fs, date);
-    entry->modified_time = fatx_to_disk_u16(fs, time);
-
-    fatx_pack_date(&(attr->created), &date);
-    fatx_pack_time(&(attr->created), &time);
-    entry->created_date = fatx_to_disk_u16(fs, date);
-    entry->created_time = fatx_to_disk_u16(fs, time);
-
-    fatx_pack_date(&(attr->accessed), &date);
-    fatx_pack_time(&(attr->accessed), &time);
-    entry->accessed_date = fatx_to_disk_u16(fs, date);
-    entry->accessed_time = fatx_to_disk_u16(fs, time);
+    fatx_pack_timestamp(fs, &(attr->modified), &(entry->modified_time), &(entry->modified_date));
+    fatx_pack_timestamp(fs, &(attr->created),  &(entry->created_time),  &(entry->created_date));
+    fatx_pack_timestamp(fs, &(attr->accessed), &(entry->accessed_time), &(entry->accessed_date));
 
     return FATX_STATUS_SUCCESS;
 }
