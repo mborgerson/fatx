@@ -5,3 +5,6 @@ __pycache__/
 *.pyc
 venv/
 gate-results/
+src/
+pkg/
+*.pkg.tar.*
