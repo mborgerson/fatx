@@ -1,3 +1,6 @@
 build/
 install/
 *.img
+__pycache__/
+*.pyc
+venv/

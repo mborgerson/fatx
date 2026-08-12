@@ -101,7 +101,12 @@ def ffibuilder():
 
         struct fatx_fs *pyfatx_open_helper(void);
 
+        enum fatx_variant { FATX_VARIANT_AUTO, FATX_VARIANT_XBOX, FATX_VARIANT_X360 };
+
+        #define FATX_OPEN_READ_ONLY ...
+
         int fatx_open_device(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster);
+        int fatx_open_device_ex(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster, enum fatx_variant variant, unsigned int flags);
         int fatx_close_device(struct fatx_fs *fs);
         int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir);
         int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *entry, struct fatx_attr *attr, struct fatx_dirent **result);
@@ -126,6 +131,7 @@ def ffibuilder():
         int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, enum fatx_format format_type, size_t sectors_per_cluster);
         int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster);
         int fatx_drive_to_offset_size(char drive_letter, uint64_t *offset, uint64_t *size);
+        int fatx_x360_partition_to_offset_size(char const *name, uint64_t *offset, uint64_t *size);
         int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint64_t first_power_on);
         """)
     return ffi
