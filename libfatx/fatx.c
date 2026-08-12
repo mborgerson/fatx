@@ -29,13 +29,13 @@
  */
 int fatx_open_device(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster)
 {
-    return fatx_open_device_ex(fs, path, offset, size, sector_size, sectors_per_cluster, FATX_VARIANT_AUTO);
+    return fatx_open_device_ex(fs, path, offset, size, sector_size, sectors_per_cluster, FATX_VARIANT_AUTO, 0);
 }
 
 /*
- * Open a device, using the given FATX variant.
+ * Open a device, using the given FATX variant and flags.
  */
-int fatx_open_device_ex(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster, enum fatx_variant variant)
+int fatx_open_device_ex(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster, enum fatx_variant variant, unsigned int flags)
 {
     int retval = 0;
 
@@ -70,16 +70,18 @@ int fatx_open_device_ex(struct fatx_fs *fs, char const *path, uint64_t offset, u
 
     fs->device_path      = path;
     fs->variant          = variant;
+    fs->read_only        = (flags & FATX_OPEN_READ_ONLY) != 0;
     fs->sector_size      = sector_size;
     fs->partition_offset = offset;
     fs->partition_size   = size;
 
     memset(&fs->fat_cache, 0, sizeof(fs->fat_cache));
 
-    fs->device = fopen(fs->device_path, "r+b");
+    fs->device = fopen(fs->device_path, fs->read_only ? "rb" : "r+b");
     if (!fs->device)
     {
-        fatx_error(fs, "failed to open %s for reading and writing\n", path);
+        fatx_error(fs, "failed to open %s for %s\n", path,
+                   fs->read_only ? "reading" : "reading and writing");
         return FATX_STATUS_ERROR;
     }
 

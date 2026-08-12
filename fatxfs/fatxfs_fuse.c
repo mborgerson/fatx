@@ -41,6 +41,7 @@ enum {
     FATX_FUSE_OPT_KEY_DRIVE,
     FATX_FUSE_OPT_KEY_VARIANT,
     FATX_FUSE_OPT_KEY_PARTITION,
+    FATX_FUSE_OPT_KEY_READ_ONLY,
     FATX_FUSE_OPT_KEY_OFFSET,
     FATX_FUSE_OPT_KEY_SIZE,
     FATX_FUSE_OPT_KEY_SECTOR_SIZE,
@@ -59,6 +60,7 @@ struct fatx_fuse_private_data {
     char              mount_partition_drive;
     char const       *mount_partition_name;
     enum fatx_variant variant;
+    int               read_only;
     size_t            mount_partition_offset;
     size_t            mount_partition_size;
     size_t            device_sector_size;
@@ -642,6 +644,10 @@ int fatx_fuse_opt_proc(void *data, const char *arg, int key, struct fuse_args *o
         pd->mount_partition_name = fatx_fuse_opt_consume_key(arg);
         return 0;
 
+    case FATX_FUSE_OPT_KEY_READ_ONLY:
+        pd->read_only = 1;
+        return 0;
+
     case FATX_FUSE_OPT_KEY_OFFSET:
         arg = fatx_fuse_opt_consume_key(arg);
         pd->mount_partition_offset = strtol(arg, NULL, 0);
@@ -733,6 +739,7 @@ void fatx_fuse_print_usage(void)
                     "    --drive=<letter>               mount an original Xbox partition by its drive letter\n"
                     "    --variant=<variant>            on-disk byte order: auto (default), xbox or x360\n"
                     "    --partition=<name>             mount an Xbox 360 partition by name (sysext, sysext2, compat, data)\n"
+                    "    --read-only                    open the device without write access at all (stronger than -o ro)\n"
                     "    --offset=<offset>              specify the offset (in bytes) of a partition manually\n"
                     "    --size=<size>                  specify the size (in bytes) of a partition manually\n"
                     "    --sector-size=<size>           specify the size (in bytes) of a device sector (default is 512)\n"
@@ -769,6 +776,7 @@ int main(int argc, char *argv[])
         FUSE_OPT_KEY("--drive=",                     FATX_FUSE_OPT_KEY_DRIVE),
         FUSE_OPT_KEY("--variant=",                   FATX_FUSE_OPT_KEY_VARIANT),
         FUSE_OPT_KEY("--partition=",                 FATX_FUSE_OPT_KEY_PARTITION),
+        FUSE_OPT_KEY("--read-only",                  FATX_FUSE_OPT_KEY_READ_ONLY),
         FUSE_OPT_KEY("--offset=",                    FATX_FUSE_OPT_KEY_OFFSET),
         FUSE_OPT_KEY("--size=",                      FATX_FUSE_OPT_KEY_SIZE),
         FUSE_OPT_KEY("--sector-size=",               FATX_FUSE_OPT_KEY_SECTOR_SIZE),
@@ -922,7 +930,8 @@ int main(int argc, char *argv[])
                                  pd.mount_partition_size,
                                  pd.device_sector_size,
                                  FATX_READ_FROM_SUPERBLOCK,
-                                 pd.variant);
+                                 pd.variant,
+                                 pd.read_only ? FATX_OPEN_READ_ONLY : 0);
     if (status)
     {
         fprintf(stderr, "failed to initialize the filesystem\n");
