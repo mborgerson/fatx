@@ -31,6 +31,7 @@
 /* Define the desired FUSE API (required before including fuse.h) */
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
+#include <sys/statvfs.h>
 #include <fuse_opt.h>
 
 #include <time.h>
@@ -93,6 +94,7 @@ int fatx_fuse_opt_proc(void *data, const char *arg, int key, struct fuse_args *o
  * Helper functions.
  */
 struct fatx_fuse_private_data *fatx_fuse_get_private_data(void);
+int fatx_fuse_statfs(const char *path, struct statvfs *stat);
 void fatx_fuse_print_usage(void);
 void fatx_fuse_print_version(void);
 
@@ -112,7 +114,38 @@ static struct fuse_operations fatx_fuse_oper = {
     .truncate = fatx_fuse_truncate,
     .rename   = fatx_fuse_rename,
     .utimens  = fatx_fuse_utimens,
+    .statfs   = fatx_fuse_statfs,
 };
+
+/*
+ * Report filesystem statistics (df/statvfs). Without this callback FUSE
+ * reports zero blocks, so tools like `df` show 0/0 and applications cannot
+ * detect the amount of free space before writing.
+ */
+int fatx_fuse_statfs(const char *path, struct statvfs *stat)
+{
+    struct fatx_fuse_private_data *pd;
+    uint64_t total_clusters, free_clusters;
+
+    pd = fatx_fuse_get_private_data();
+    if (pd == NULL) return -EFAULT;
+
+    if (fatx_get_fs_stat(pd->fs, &total_clusters, &free_clusters) != FATX_STATUS_SUCCESS)
+    {
+        return -EIO;
+    }
+
+    memset(stat, 0, sizeof(*stat));
+    stat->f_bsize   = pd->fs->bytes_per_cluster;
+    stat->f_frsize  = pd->fs->bytes_per_cluster;
+    stat->f_blocks  = total_clusters;
+    stat->f_bfree   = free_clusters;
+    stat->f_bavail  = free_clusters;
+    stat->f_files   = 0;
+    stat->f_ffree   = ~0UL / 2;
+    stat->f_namemax = FATX_MAX_FILENAME_LEN;
+    return 0;
+}
 
 /*
  * Simple convenince function to get the private data struct.
@@ -767,6 +800,29 @@ int main(int argc, char *argv[])
         goto error_nofs;
     }
 
+    /* Resolve user-supplied paths to absolute ones. After fuse_main() the
+     * process daemonizes and chdir()s to /, so any relative path resolved
+     * past that point silently points elsewhere (issue #64: the mount
+     * "succeeds" but shows an empty directory). The mount point itself is
+     * realpath'd by libfuse; the device and log paths are ours to fix.
+     */
+    {
+        char *abs = realpath(pd.device_path, NULL);
+        if (abs != NULL)
+        {
+            pd.device_path = abs;
+        }
+        if (pd.log_path != NULL)
+        {
+            /* The log file may not exist yet - resolve its directory. */
+            abs = realpath(pd.log_path, NULL);
+            if (abs != NULL)
+            {
+                pd.log_path = abs;
+            }
+        }
+    }
+
     if (pd.mount_partition_offset != -1 || pd.mount_partition_size != -1)
     {
         /* Partition Specified Manually */
@@ -794,20 +850,65 @@ int main(int argc, char *argv[])
         /* Drive Letter Specified */
         if (pd.mount_partition_drive == 0x00)
         {
-            pd.mount_partition_drive = 'c';
+            /* No drive and no offset given: auto-detect a bare FATX image
+             * (Xbox Memory Unit dumps and single-partition images carry the
+             * signature right at offset 0). Falls back to drive C otherwise.
+             * Addresses issue #74.
+             */
+            FILE *probe = fopen(pd.device_path, "rb");
+            char sig[4] = {0};
+            if (probe != NULL)
+            {
+                if (fread(sig, 1, 4, probe) == 4 && memcmp(sig, "FATX", 4) == 0)
+                {
+                    fseek(probe, 0, SEEK_END);
+                    pd.mount_partition_offset = 0;
+                    pd.mount_partition_size   = ftell(probe);
+                    fprintf(stderr, "FATX signature at offset 0: mounting as a bare image/XMU (size 0x%zx)\n",
+                            pd.mount_partition_size);
+                }
+                fclose(probe);
+            }
+            if (pd.mount_partition_offset == -1)
+            {
+                pd.mount_partition_drive = 'c';
+            }
         }
 
-        status = fatx_drive_to_offset_size(pd.mount_partition_drive,
-                                           &pd.mount_partition_offset,
-                                           &pd.mount_partition_size);
-        if (status)
+        if (pd.mount_partition_drive != 0x00)
         {
-            fprintf(stderr, "unknown drive letter '%c'\n", pd.mount_partition_drive);
-            goto error_nofs;
+            /* An XBpartitioner-style table in sector 0 overrides the fixed
+             * retail layout (the only way F/G can have custom sizes) - #75.
+             */
+            status = fatx_disk_read_partition_map(pd.device_path,
+                                                  pd.mount_partition_drive,
+                                                  &pd.mount_partition_offset,
+                                                  &pd.mount_partition_size);
+            if (status == FATX_STATUS_SUCCESS)
+            {
+                fprintf(stderr, "using partition table entry for drive %c (offset=0x%zx size=0x%zx)\n",
+                        pd.mount_partition_drive,
+                        pd.mount_partition_offset, pd.mount_partition_size);
+            }
+            else
+            {
+                status = fatx_drive_to_offset_size(pd.mount_partition_drive,
+                                                   &pd.mount_partition_offset,
+                                                   &pd.mount_partition_size);
+                if (status)
+                {
+                    fprintf(stderr, "unknown drive letter '%c'\n", pd.mount_partition_drive);
+                    goto error_nofs;
+                }
+            }
         }
     }
 
-    pd.fs = malloc(sizeof(struct fatx_fs));
+    /* calloc, not malloc: fatx_log() dereferences fs->log_handle, which is
+     * only assigned when --log is given. With malloc the handle is whatever
+     * happens to be on the heap and the first debug print crashes.
+     */
+    pd.fs = calloc(1, sizeof(struct fatx_fs));
     if (pd.fs == NULL)
     {
         fprintf(stderr, "no memory\n");

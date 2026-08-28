@@ -160,6 +160,8 @@ int fatx_rmdir(struct fatx_fs *fs, char const *path);
 int fatx_mknod(struct fatx_fs *fs, char const *path);
 int fatx_truncate(struct fatx_fs *fs, char const *path, off_t offset);
 int fatx_rename(struct fatx_fs *fs, char const *from, char const *to, bool exchange, bool no_replace);
+int fatx_get_fs_stat(struct fatx_fs *fs, uint64_t *total_clusters, uint64_t *free_clusters);
+int fatx_disk_read_partition_map(char const *path, char drive_letter, uint64_t *offset, uint64_t *size);
 void fatx_time_t_to_fatx_ts(const time_t in, struct fatx_ts *out);
 time_t fatx_ts_to_time_t(const struct fatx_ts *in);
 

@@ -12,8 +12,8 @@ use zerocopy::byteorder::little_endian::{U16, U32};
 use zerocopy::*;
 
 const FATX_SIGNATURE: u32 = 0x58544146; // 'FATX'
-const FATX_FAT_OFFSET_BYTES: u64 = 4096;
-const FATX_FAT_RESERVED_ENTRIES_COUNT: u32 = 1;
+pub(crate) const FATX_FAT_OFFSET_BYTES: u64 = 4096;
+pub(crate) const FATX_FAT_RESERVED_ENTRIES_COUNT: u32 = 1;
 
 // The superblock, as it appears on disk.
 #[derive(FromBytes, IntoBytes, KnownLayout, Immutable, Unaligned, Debug)]
@@ -40,6 +40,9 @@ pub struct FatxFs {
     pub(crate) root_cluster: u32,
     pub(crate) cluster_offset_bytes: u64,
     pub(crate) fat: Fat,
+    /// Rotating allocation hint (mirrors libfatx's scan pointer, per-fs).
+    pub(crate) alloc_hint: u32,
+    pub(crate) writable: bool,
 }
 
 pub struct FatxFsConfig {
@@ -47,6 +50,7 @@ pub struct FatxFsConfig {
     partition_offset_bytes: u64,
     partition_size_bytes: u64,
     num_bytes_per_sector: u64,
+    writable: bool,
 }
 
 impl FatxFsConfig {
@@ -57,7 +61,22 @@ impl FatxFsConfig {
             partition_offset_bytes: partition.offset_bytes,
             partition_size_bytes: partition.size_bytes,
             num_bytes_per_sector: 512,
+            writable: false,
         }
+    }
+
+    /// Overrides the partition location explicitly (e.g. from an on-disk
+    /// XBpartitioner table, which is the only way F/G get custom sizes).
+    pub fn offset_size(mut self, offset_bytes: u64, size_bytes: u64) -> Self {
+        self.partition_offset_bytes = offset_bytes;
+        self.partition_size_bytes = size_bytes;
+        self
+    }
+
+    /// Opens the device read-write, enabling the write API.
+    pub fn writable(mut self, writable: bool) -> Self {
+        self.writable = writable;
+        self
     }
 
     pub fn drive_letter(mut self, letter: &str) -> Self {
@@ -78,15 +97,27 @@ impl FatxFs {
         {
             return Err(Error::InvalidPartitionOffset);
         }
-        if !config
-            .partition_size_bytes
-            .is_multiple_of(config.num_bytes_per_sector)
+        if config.partition_size_bytes != 0
+            && !config
+                .partition_size_bytes
+                .is_multiple_of(config.num_bytes_per_sector)
         {
             return Err(Error::InvalidPartitionSize);
         }
 
         // Open device
-        let mut device_handle = std::fs::File::open(&config.device_path)?;
+        let mut device_handle = std::fs::OpenOptions::new()
+            .read(true)
+            .write(config.writable)
+            .open(&config.device_path)?;
+        // A partition size of 0 means "extends to the end of the device"
+        // (used by the F partition of oversized original-Xbox disks).
+        let mut partition_size_bytes = config.partition_size_bytes;
+        if partition_size_bytes == 0 {
+            let end = device_handle.seek(SeekFrom::End(0))?;
+            partition_size_bytes = end.saturating_sub(config.partition_offset_bytes);
+            partition_size_bytes -= partition_size_bytes % config.num_bytes_per_sector;
+        }
         device_handle.seek(SeekFrom::Start(config.partition_offset_bytes))?;
 
         // Read superblock
@@ -107,7 +138,7 @@ impl FatxFs {
 
         // Calculate FAT size
         let fat_offset_bytes = config.partition_offset_bytes + FATX_FAT_OFFSET_BYTES;
-        let num_fat_entries = (config.partition_size_bytes / num_bytes_per_cluster) as u32;
+        let num_fat_entries = (partition_size_bytes / num_bytes_per_cluster) as u32;
         if root_cluster >= num_fat_entries {
             log::error!("Root cluster of {} exceeds cluster limit", root_cluster);
             return Err(Error::InvalidRootCluster);
@@ -121,7 +152,7 @@ impl FatxFs {
         // Cluster geometry cont'd
         let cluster_offset_bytes = fat_offset_bytes + fat.fat_size_bytes;
         let num_clusters =
-            ((config.partition_size_bytes - fat.fat_size_bytes - FATX_FAT_OFFSET_BYTES)
+            ((partition_size_bytes - fat.fat_size_bytes - FATX_FAT_OFFSET_BYTES)
                 / num_bytes_per_cluster
                 + FATX_FAT_RESERVED_ENTRIES_COUNT as u64) as u32;
 
@@ -130,13 +161,15 @@ impl FatxFs {
                 self_handle: weak_self.clone(),
                 device_handle,
                 partition_offset_bytes: config.partition_offset_bytes,
-                partition_size_bytes: config.partition_size_bytes,
+                partition_size_bytes,
                 num_clusters,
                 num_bytes_per_cluster,
                 num_entries_per_cluster,
                 root_cluster,
                 cluster_offset_bytes,
                 fat,
+                alloc_hint: FATX_FAT_RESERVED_ENTRIES_COUNT + 1,
+                writable: config.writable,
             })
         });
 

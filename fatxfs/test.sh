@@ -8,11 +8,10 @@ function checksum {
 mkdir -p c
 
 # Format the disk
-if [[ "$(uname)" == "Darwin" ]]; then
-	truncate -s 8g xbox_hdd.img
-else
-	fallocate -l 8G xbox_hdd.img
-fi
+# truncate creates a sparse file everywhere; fallocate fails on filesystems
+# without preallocation support (e.g. Docker volumes mounted from a Windows
+# host over 9p) - issue #79.
+truncate -s 8G xbox_hdd.img
 fatxfs --format=retail --destroy-all-existing-data xbox_hdd.img c
 sleep 1
 

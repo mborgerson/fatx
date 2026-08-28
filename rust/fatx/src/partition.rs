@@ -30,6 +30,13 @@ pub const DEFAULT_PARTITION_LAYOUT: &[PartitionMapEntry] = &[
         offset_bytes: 0xabe80000,
         size_bytes: 0x1312d6000,
     },
+    // F covers everything past the retail region on oversized disks
+    // ("F takes all"); size 0 = extends to the end of the device.
+    PartitionMapEntry {
+        letter: "f",
+        offset_bytes: 0x1dd156000,
+        size_bytes: 0,
+    },
 ];
 
 impl PartitionMapEntry {

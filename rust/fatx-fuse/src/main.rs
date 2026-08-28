@@ -10,8 +10,8 @@ use clap::Parser;
 use clap::builder::styling::{AnsiColor, Effects, Style, Styles};
 use fatx::{DirectoryEntry, FatxFs, FatxFsConfig, FatxFsHandle};
 use fuser::{
-    FileAttr, FileType, Filesystem, MountOption, ReplyAttr, ReplyData, ReplyDirectory, ReplyEntry,
-    Request,
+    FileAttr, FileType, Filesystem, MountOption, ReplyAttr, ReplyCreate, ReplyData,
+    ReplyDirectory, ReplyEmpty, ReplyEntry, ReplyStatfs, ReplyWrite, Request, TimeOrNow,
 };
 use libc::ENOENT;
 
@@ -50,11 +50,49 @@ impl InodeTracker {
         let bimap = self.bimap.lock().unwrap();
         bimap.get_by_left(&inode).cloned()
     }
+
+    fn forget_path(&self, path: &str) {
+        let mut bimap = self.bimap.lock().unwrap();
+        bimap.remove_by_right(path);
+    }
+
+    fn rename_path(&self, from: &str, to: &str) {
+        let mut bimap = self.bimap.lock().unwrap();
+        if let Some((ino, _)) = bimap.remove_by_right(from) {
+            bimap.remove_by_right(to);
+            bimap.insert(ino, to.to_string());
+        }
+    }
 }
 
 struct FuseFatxFs {
     fatx: FatxFsHandle,
     inodes: InodeTracker,
+}
+
+fn errno(e: &fatx::Error) -> i32 {
+    let io: std::io::Error = match e {
+        fatx::Error::NoSpace => return libc::ENOSPC,
+        fatx::Error::AlreadyExists => return libc::EEXIST,
+        fatx::Error::DirectoryNotEmpty => return libc::ENOTEMPTY,
+        fatx::Error::InvalidName => return libc::EINVAL,
+        fatx::Error::FileTooLarge => return libc::EFBIG,
+        fatx::Error::ReadOnly => return libc::EROFS,
+        fatx::Error::NotFound => return libc::ENOENT,
+        fatx::Error::IsADirectory => return libc::EISDIR,
+        fatx::Error::NotADirectory => return libc::ENOTDIR,
+        _ => std::io::Error::other(e.to_string()),
+    };
+    io.raw_os_error().unwrap_or(libc::EIO)
+}
+
+impl FuseFatxFs {
+    fn child_path(&self, parent: u64, name: &OsStr) -> Option<String> {
+        let root = self.inodes.get_path(parent)?;
+        let mut path = PathBuf::from(root);
+        path.push(name.to_str()?);
+        Some(path.to_str()?.to_string())
+    }
 }
 
 fn fatx_datetime_to_systemtime(datetime: fatx::DateTime) -> SystemTime {
@@ -241,6 +279,202 @@ impl Filesystem for FuseFatxFs {
             reply.ok();
         }
     }
+
+    // ── Write support ───────────────────────────────────────────────────────
+
+    fn statfs(&mut self, _req: &Request, _ino: u64, reply: ReplyStatfs) {
+        match self.fatx.statfs() {
+            Ok(st) => reply.statfs(
+                st.total_clusters,
+                st.free_clusters,
+                st.free_clusters,
+                0,
+                u64::MAX / 2,
+                st.bytes_per_cluster as u32,
+                st.max_filename_len,
+                st.bytes_per_cluster as u32,
+            ),
+            Err(e) => reply.error(errno(&e)),
+        }
+    }
+
+    fn create(
+        &mut self,
+        _req: &Request,
+        parent: u64,
+        name: &OsStr,
+        _mode: u32,
+        _umask: u32,
+        _flags: i32,
+        reply: ReplyCreate,
+    ) {
+        match self.child_path(parent, name) {
+            Some(path) => match self.fatx.create_file(&path) {
+                Ok(()) => {
+                    let inode = self.inodes.get_or_create_inode(&path);
+                    match self
+                        .fatx
+                        .stat(&path)
+                        .ok()
+                        .and_then(|d| self.dirent_to_attr(inode, &d))
+                    {
+                        Some(attr) => reply.created(&TTL, &attr, 0, inode, 0),
+                        None => reply.error(libc::EIO),
+                    }
+                }
+                Err(e) => reply.error(errno(&e)),
+            },
+            None => reply.error(ENOENT),
+        }
+    }
+
+    fn mkdir(
+        &mut self,
+        _req: &Request,
+        parent: u64,
+        name: &OsStr,
+        _mode: u32,
+        _umask: u32,
+        reply: ReplyEntry,
+    ) {
+        match self.child_path(parent, name) {
+            Some(path) => match self.fatx.mkdir(&path) {
+                Ok(()) => {
+                    let inode = self.inodes.get_or_create_inode(&path);
+                    match self
+                        .fatx
+                        .stat(&path)
+                        .ok()
+                        .and_then(|d| self.dirent_to_attr(inode, &d))
+                    {
+                        Some(attr) => reply.entry(&TTL, &attr, 0),
+                        None => reply.error(libc::EIO),
+                    }
+                }
+                Err(e) => reply.error(errno(&e)),
+            },
+            None => reply.error(ENOENT),
+        }
+    }
+
+    fn unlink(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEmpty) {
+        match self.child_path(parent, name) {
+            Some(path) => match self.fatx.unlink(&path) {
+                Ok(()) => {
+                    self.inodes.forget_path(&path);
+                    reply.ok()
+                }
+                Err(e) => reply.error(errno(&e)),
+            },
+            None => reply.error(ENOENT),
+        }
+    }
+
+    fn rmdir(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEmpty) {
+        match self.child_path(parent, name) {
+            Some(path) => match self.fatx.rmdir(&path) {
+                Ok(()) => {
+                    self.inodes.forget_path(&path);
+                    reply.ok()
+                }
+                Err(e) => reply.error(errno(&e)),
+            },
+            None => reply.error(ENOENT),
+        }
+    }
+
+    fn rename(
+        &mut self,
+        _req: &Request,
+        parent: u64,
+        name: &OsStr,
+        newparent: u64,
+        newname: &OsStr,
+        _flags: u32,
+        reply: ReplyEmpty,
+    ) {
+        let (Some(from), Some(to)) = (
+            self.child_path(parent, name),
+            self.child_path(newparent, newname),
+        ) else {
+            return reply.error(ENOENT);
+        };
+        match self.fatx.rename(&from, &to) {
+            Ok(()) => {
+                self.inodes.rename_path(&from, &to);
+                reply.ok()
+            }
+            Err(e) => reply.error(errno(&e)),
+        }
+    }
+
+    fn setattr(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        _mode: Option<u32>,
+        _uid: Option<u32>,
+        _gid: Option<u32>,
+        size: Option<u64>,
+        _atime: Option<TimeOrNow>,
+        _mtime: Option<TimeOrNow>,
+        _ctime: Option<SystemTime>,
+        _fh: Option<u64>,
+        _crtime: Option<SystemTime>,
+        _chgtime: Option<SystemTime>,
+        _bkuptime: Option<SystemTime>,
+        _flags: Option<u32>,
+        reply: ReplyAttr,
+    ) {
+        let Some(path) = self.inodes.get_path(ino) else {
+            return reply.error(ENOENT);
+        };
+        if let Some(new_size) = size {
+            if new_size > u32::MAX as u64 {
+                return reply.error(libc::EFBIG);
+            }
+            if let Err(e) = self.fatx.truncate(&path, new_size as u32) {
+                return reply.error(errno(&e));
+            }
+        }
+        match self
+            .fatx
+            .stat(&path)
+            .ok()
+            .and_then(|d| self.dirent_to_attr(ino, &d))
+        {
+            Some(attr) => reply.attr(&TTL, &attr),
+            None => reply.error(ENOENT),
+        }
+    }
+
+    fn write(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        _fh: u64,
+        offset: i64,
+        data: &[u8],
+        _write_flags: u32,
+        _flags: i32,
+        _lock_owner: Option<u64>,
+        reply: ReplyWrite,
+    ) {
+        let Some(path) = self.inodes.get_path(ino) else {
+            return reply.error(ENOENT);
+        };
+        match self.fatx.write(&path, offset.max(0) as u64, data) {
+            Ok(n) => reply.written(n as u32),
+            Err(e) => reply.error(errno(&e)),
+        }
+    }
+
+    fn fsync(&mut self, _req: &Request, _ino: u64, _fh: u64, _datasync: bool, reply: ReplyEmpty) {
+        match self.fatx.sync() {
+            Ok(()) => reply.ok(),
+            Err(e) => reply.error(errno(&e)),
+        }
+    }
 }
 
 const HEADER: Style = AnsiColor::Green.on_default().effects(Effects::BOLD);
@@ -270,8 +504,8 @@ struct Cli {
     #[arg()]
     device_path: String,
 
-    /// FUSE filesystem mount point
-    #[arg()]
+    /// FUSE filesystem mount point (not required with --list)
+    #[arg(default_value = "")]
     mount_point: String,
 
     /// Drive letter of c|e|x|y|z
@@ -285,12 +519,153 @@ struct Cli {
     /// Allow root
     #[arg(long)]
     allow_root: bool,
+
+    /// Mount read-only (writes are enabled by default)
+    #[arg(long)]
+    read_only: bool,
+
+    /// List FATX partitions found on the device and exit (mount point not required)
+    #[arg(long)]
+    list: bool,
+
+    /// Mount ALL detected partitions under the mount point, one subdirectory
+    /// per drive letter (x y z c e f). Ctrl-C unmounts everything.
+    #[arg(long)]
+    all: bool,
+}
+
+/// Probes every known original-Xbox partition offset for the FATX signature.
+/// Returns (letter, offset, size) for each match; size 0 = to end of device.
+
+/// XBpartitioner-style table in sector 0 (issue #75): 16-byte magic
+/// "****PARTINFO****", 32 reserved bytes, then up to 14 entries of
+/// { name[16], flags u32, lba_start u32, lba_size u32, reserved u32 },
+/// little-endian, 512-byte LBAs. Entries map to drive letters by their
+/// start LBA; entries past the retail region are F and G.
+fn probe_xbp_table(device: &str) -> Option<Vec<(&'static str, u64, u64)>> {
+    use std::io::Read;
+    let mut f = std::fs::File::open(device).ok()?;
+    let mut sector = [0u8; 512];
+    f.read_exact(&mut sector).ok()?;
+    if &sector[..16] != b"****PARTINFO****" {
+        return None;
+    }
+    let mut out = Vec::new();
+    let mut f_seen = false;
+    for i in 0..14 {
+        let e = &sector[48 + i * 32..48 + (i + 1) * 32];
+        let flags = u32::from_le_bytes(e[16..20].try_into().unwrap());
+        let lba_start = u32::from_le_bytes(e[20..24].try_into().unwrap());
+        let lba_size = u32::from_le_bytes(e[24..28].try_into().unwrap());
+        if flags & 0x8000_0000 == 0 || lba_size == 0 {
+            continue;
+        }
+        let letter = match lba_start {
+            0x0000_0400 => "x",
+            0x0017_7400 => "y",
+            0x002E_E400 => "z",
+            0x0046_5400 => "c",
+            0x0055_F400 => "e",
+            s if s >= 0x00EE_8AB0 => {
+                if f_seen { "g" } else { f_seen = true; "f" }
+            }
+            _ => continue,
+        };
+        out.push((letter, lba_start as u64 * 512, lba_size as u64 * 512));
+    }
+    Some(out)
+}
+
+fn probe(device: &str) -> std::io::Result<Vec<(&'static str, u64, u64)>> {
+    use std::io::{Read, Seek};
+    // A partition table on disk overrides the fixed retail layout.
+    if let Some(parts) = probe_xbp_table(device) {
+        if !parts.is_empty() {
+            return Ok(parts);
+        }
+    }
+    let mut f = std::fs::File::open(device)?;
+    let mut found = Vec::new();
+    for entry in fatx::DEFAULT_PARTITION_LAYOUT {
+        if f.seek(std::io::SeekFrom::Start(entry.offset_bytes)).is_err() {
+            continue;
+        }
+        let mut sig = [0u8; 4];
+        if f.read_exact(&mut sig).is_ok() && &sig == b"FATX" {
+            found.push((entry.letter, entry.offset_bytes, entry.size_bytes));
+        }
+    }
+    Ok(found)
+}
+
+fn wait_for_ctrl_c() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let stop = Arc::new(AtomicBool::new(false));
+    let s2 = stop.clone();
+    ctrlc::set_handler(move || s2.store(true, Ordering::SeqCst))
+        .expect("installing Ctrl-C handler");
+    while !stop.load(Ordering::SeqCst) {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
 }
 
 fn main() {
     env_logger::init();
     let cli = Cli::parse();
-    let mut options = vec![MountOption::RO, MountOption::FSName("fatx".to_string())];
+
+    if cli.list {
+        let parts = probe(&cli.device_path).expect("probing device");
+        if parts.is_empty() {
+            println!("No FATX partitions found on {}", cli.device_path);
+            return;
+        }
+        println!("{:<7} {:<14} SIZE", "LETTER", "OFFSET");
+        for (letter, offset, size) in parts {
+            let size = if size == 0 { "to-end".into() } else { format!("{size:#x}") };
+            println!("{letter:<7} {offset:<#14x} {size}");
+        }
+        return;
+    }
+    if cli.mount_point.is_empty() {
+        eprintln!("error: mount point required (or use --list)");
+        std::process::exit(2);
+    }
+
+    if cli.all {
+        let parts = probe(&cli.device_path).expect("probing device");
+        assert!(!parts.is_empty(), "no FATX partitions found");
+        let mut sessions = Vec::new();
+        for (letter, offset, size) in &parts {
+            let dir = std::path::Path::new(&cli.mount_point).join(letter);
+            std::fs::create_dir_all(&dir).expect("creating mount subdirectory");
+            let config = FatxFsConfig::new(cli.device_path.clone())
+                .offset_size(*offset, *size)
+                .writable(!cli.read_only);
+            let fs = FuseFatxFs {
+                fatx: FatxFs::open_device(&config).expect("opening partition"),
+                inodes: InodeTracker::new(),
+            };
+            let mut options = vec![MountOption::FSName(format!("fatx.{letter}"))];
+            if cli.read_only {
+                options.push(MountOption::RO);
+            }
+            eprintln!("fatx-fuse: {} -> {}", letter, dir.display());
+            sessions.push(
+                fuser::spawn_mount2(fs, &dir, &options).expect("mounting partition"),
+            );
+        }
+        eprintln!("fatx-fuse: {} partition(s) mounted — Ctrl-C to unmount all", sessions.len());
+        wait_for_ctrl_c();
+        drop(sessions);
+        eprintln!("fatx-fuse: all partitions unmounted");
+        return;
+    }
+
+    let mut options = vec![MountOption::FSName("fatx".to_string())];
+    if cli.read_only {
+        options.push(MountOption::RO);
+    }
     if cli.auto_unmount {
         options.push(MountOption::AutoUnmount);
     }
@@ -298,7 +673,22 @@ fn main() {
         options.push(MountOption::AllowRoot);
     }
 
-    let config = FatxFsConfig::new(cli.device_path).drive_letter(&cli.drive_letter);
+    // Prefer the on-disk partition table entry for the chosen letter (the
+    // only way F/G can have non-default sizes); fall back to the fixed layout.
+    let table_entry = probe_xbp_table(&cli.device_path).and_then(|parts| {
+        parts
+            .iter()
+            .find(|(l, _, _)| *l == cli.drive_letter)
+            .map(|(_, o, s)| (*o, *s))
+    });
+    let config = match table_entry {
+        Some((offset, size)) => {
+            eprintln!("fatx-fuse: using partition table entry for {}", cli.drive_letter);
+            FatxFsConfig::new(cli.device_path.clone()).offset_size(offset, size)
+        }
+        None => FatxFsConfig::new(cli.device_path.clone()).drive_letter(&cli.drive_letter),
+    }
+    .writable(!cli.read_only);
 
     let fs = FuseFatxFs {
         fatx: FatxFs::open_device(&config).unwrap(),

@@ -70,7 +70,11 @@ int fatx_disk_size(char const *path, uint64_t *size)
         return FATX_STATUS_ERROR;
     }
 
-    if (fseek(device, 0, SEEK_END))
+#ifdef _WIN32
+    if (_fseeki64(device, 0, SEEK_END))
+#else
+    if (fseeko(device, 0, SEEK_END))
+#endif
     {
         fprintf(stderr, "failed to seek to end of disk\n");
         retval = FATX_STATUS_ERROR;
@@ -226,7 +230,11 @@ int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint
         return FATX_STATUS_ERROR;
     }
 
-    if (fseek(device, FATX_REFURB_OFFSET, SEEK_CUR))
+#ifdef _WIN32
+    if (_fseeki64(device, FATX_REFURB_OFFSET, SEEK_CUR))
+#else
+    if (fseeko(device, FATX_REFURB_OFFSET, SEEK_CUR))
+#endif
     {
         fprintf(stderr, "failed to seek to the refurb info (offset 0x%x)\n", FATX_REFURB_OFFSET);
         retval = FATX_STATUS_ERROR;
@@ -234,9 +242,9 @@ int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint
     }
 
     memset(&refurb_info, 0, sizeof(struct fatx_refurb_info));
-    refurb_info.signature = FATX_REFURB_SIGNATURE;
-    refurb_info.number_of_boots = number_of_boots;
-    refurb_info.first_power_on = first_power_on;
+    refurb_info.signature = fatx_le32(FATX_REFURB_SIGNATURE);
+    refurb_info.number_of_boots = fatx_le32(number_of_boots);
+    refurb_info.first_power_on = fatx_le64(first_power_on);
 
     if (fwrite(&refurb_info, sizeof(struct fatx_refurb_info), 1, device) != 1)
     {
@@ -250,4 +258,83 @@ int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint
 cleanup:
     fclose(device);
     return retval;
+}
+/*
+ * XBpartitioner-style partition table (issue #75).
+ *
+ * Homebrew tools (XBpartitioner, LBA48 BIOS patches) store a partition table
+ * in sector 0: 16-byte magic "****PARTINFO****", 32 reserved bytes, then up
+ * to 14 entries of { char name[16]; u32 flags; u32 lba_start; u32 lba_size;
+ * u32 reserved } (little-endian, 512-byte LBAs). Entries are matched to
+ * drive letters by their start LBA against the retail layout; entries at or
+ * past the end of the retail region are F and G. This is the only way an
+ * F/G drive can have a non-default size.
+ */
+#pragma pack(1)
+struct fatx_xbp_entry {
+    char     name[16];
+    uint32_t flags;
+    uint32_t lba_start;
+    uint32_t lba_size;
+    uint32_t reserved;
+};
+struct fatx_xbp_table {
+    char   magic[16];
+    char   reserved[32];
+    struct fatx_xbp_entry entries[14];
+};
+#pragma pack()
+
+#define FATX_XBP_IN_USE  0x80000000
+#define FATX_XBP_F_START 0x00EE8AB0 /* first LBA past the retail region */
+
+int fatx_disk_read_partition_map(char const *path, char drive_letter,
+                                 uint64_t *offset, uint64_t *size)
+{
+    struct fatx_xbp_table table;
+    FILE *device;
+    size_t read;
+    int f_seen = 0;
+
+    device = fopen(path, "rb");
+    if (!device) return FATX_STATUS_ERROR;
+    read = fread(&table, sizeof(table), 1, device);
+    fclose(device);
+    if (read != 1 || memcmp(table.magic, "****PARTINFO****", 16) != 0)
+    {
+        return FATX_STATUS_ERROR; /* no table present */
+    }
+
+    for (int i = 0; i < 14; i++)
+    {
+        struct fatx_xbp_entry *e = &table.entries[i];
+        uint32_t flags = fatx_le32(e->flags);
+        uint64_t start = (uint64_t)fatx_le32(e->lba_start) * 512;
+        uint64_t len   = (uint64_t)fatx_le32(e->lba_size) * 512;
+        char letter;
+
+        if (!(flags & FATX_XBP_IN_USE) || len == 0)
+            continue;
+
+        switch (fatx_le32(e->lba_start))
+        {
+            case 0x00000400: letter = 'x'; break;
+            case 0x00177400: letter = 'y'; break;
+            case 0x002EE400: letter = 'z'; break;
+            case 0x00465400: letter = 'c'; break;
+            case 0x0055F400: letter = 'e'; break;
+            default:
+                if (fatx_le32(e->lba_start) >= FATX_XBP_F_START)
+                    letter = f_seen++ ? 'g' : 'f';
+                else
+                    continue;
+        }
+        if (letter == drive_letter)
+        {
+            *offset = start;
+            *size   = len;
+            return FATX_STATUS_SUCCESS;
+        }
+    }
+    return FATX_STATUS_ERROR;
 }

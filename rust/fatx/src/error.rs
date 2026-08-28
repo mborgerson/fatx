@@ -25,6 +25,18 @@ pub enum Error {
     NotADirectory,
     #[error("the path unxpectedly identifies a directory")]
     IsADirectory,
+    #[error("no space left on the volume")]
+    NoSpace,
+    #[error("the name is not a valid FATX filename")]
+    InvalidName,
+    #[error("an entry with this name already exists")]
+    AlreadyExists,
+    #[error("the directory is not empty")]
+    DirectoryNotEmpty,
+    #[error("the file would exceed the FATX size limit (4 GiB - 1)")]
+    FileTooLarge,
+    #[error("the filesystem is mounted read-only")]
+    ReadOnly,
 }
 
 impl From<Error> for io::Error {
@@ -34,6 +46,12 @@ impl From<Error> for io::Error {
             Error::NotFound => io::Error::new(io::ErrorKind::NotFound, err),
             Error::NotADirectory => io::Error::new(io::ErrorKind::NotADirectory, err),
             Error::IsADirectory => io::Error::new(io::ErrorKind::IsADirectory, err),
+            Error::NoSpace => io::Error::new(io::ErrorKind::StorageFull, err),
+            Error::InvalidName => io::Error::new(io::ErrorKind::InvalidInput, err),
+            Error::AlreadyExists => io::Error::new(io::ErrorKind::AlreadyExists, err),
+            Error::DirectoryNotEmpty => io::Error::new(io::ErrorKind::DirectoryNotEmpty, err),
+            Error::FileTooLarge => io::Error::new(io::ErrorKind::FileTooLarge, err),
+            Error::ReadOnly => io::Error::new(io::ErrorKind::ReadOnlyFilesystem, err),
             _ => io::Error::other(err),
         }
     }
