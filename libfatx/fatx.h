@@ -65,6 +65,29 @@ extern "C" {
 
 #define FATX_FAT_CACHE_NUM_ENTRIES   512
 
+/*
+ * Which console's flavour of FATX a filesystem is.
+ *
+ * The two are the same filesystem with opposite on-disk byte order. AUTO probes
+ * the partition signature to work out which, and is what fatx_open_device uses;
+ * pass an explicit variant to fatx_open_device_ex to skip the probe.
+ */
+enum fatx_variant {
+    FATX_VARIANT_AUTO = 0, /* detect from the partition signature */
+    FATX_VARIANT_XBOX,     /* original Xbox, little-endian on disk */
+    FATX_VARIANT_X360      /* Xbox 360, big-endian on disk */
+};
+
+/*
+ * Flags for fatx_open_device_ex.
+ *
+ * FATX_OPEN_READ_ONLY opens the underlying device without write access at all,
+ * and makes the library refuse every write. FUSE's own -o ro does not do this:
+ * it stops the kernel issuing writes, but the device is still opened
+ * read-write, so a bug in the driver could still reach the disk.
+ */
+#define FATX_OPEN_READ_ONLY (1u<<0)
+
 struct fatx_cache {
     size_t position;
     size_t entries;
@@ -76,6 +99,8 @@ struct fatx_cache {
 struct fatx_fs {
     char const       *device_path;
     FILE             *device;
+    enum fatx_variant variant;
+    int               read_only;
     size_t            sector_size;
     uint64_t          partition_offset;
     uint64_t          partition_size;
@@ -132,6 +157,19 @@ struct fatx_partition_map_entry {
     uint64_t size;
 };
 
+/*
+ * Xbox 360 Harddisk Partition Map
+ *
+ * The 360 has no MBR/GPT and no drive letters: partitions live at fixed offsets
+ * and are identified here by name.
+ */
+
+struct fatx_x360_partition_map_entry {
+    char const *name;
+    uint64_t    offset;
+    uint64_t    size;
+};
+
 enum fatx_format {
     FATX_FORMAT_INVALID,
     FATX_FORMAT_RETAIL,
@@ -140,6 +178,7 @@ enum fatx_format {
 
 /* FATX Functions */
 int fatx_open_device(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster);
+int fatx_open_device_ex(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster, enum fatx_variant variant, unsigned int flags);
 int fatx_close_device(struct fatx_fs *fs);
 int fatx_open_dir(struct fatx_fs *fs, char const *path, struct fatx_dir *dir);
 int fatx_read_dir(struct fatx_fs *fs, struct fatx_dir *dir, struct fatx_dirent *entry, struct fatx_attr *attr, struct fatx_dirent **result);
@@ -169,6 +208,8 @@ int fatx_disk_size_remaining(char const *path, uint64_t offset, uint64_t *size);
 int fatx_disk_format(struct fatx_fs *fs, char const *path, size_t sector_size, enum fatx_format format_type, size_t sectors_per_cluster);
 int fatx_disk_format_partition(struct fatx_fs *fs, char const *path, uint64_t offset, uint64_t size, size_t sector_size, size_t sectors_per_cluster);
 int fatx_drive_to_offset_size(char drive_letter, uint64_t *offset, uint64_t *size);
+int fatx_x360_partition_to_offset_size(char const *name, uint64_t *offset, uint64_t *size);
+char const *fatx_x360_partition_names(void);
 int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint64_t first_power_on);
 
 /* Misc Functions */

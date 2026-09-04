@@ -39,6 +39,9 @@ enum {
     FATX_FUSE_OPT_KEY_HELP,
     FATX_FUSE_OPT_KEY_VERSION,
     FATX_FUSE_OPT_KEY_DRIVE,
+    FATX_FUSE_OPT_KEY_VARIANT,
+    FATX_FUSE_OPT_KEY_PARTITION,
+    FATX_FUSE_OPT_KEY_READ_ONLY,
     FATX_FUSE_OPT_KEY_OFFSET,
     FATX_FUSE_OPT_KEY_SIZE,
     FATX_FUSE_OPT_KEY_SECTOR_SIZE,
@@ -55,6 +58,9 @@ struct fatx_fuse_private_data {
     char const       *log_path;
     char             *mount_point;
     char              mount_partition_drive;
+    char const       *mount_partition_name;
+    enum fatx_variant variant;
+    int               read_only;
     size_t            mount_partition_offset;
     size_t            mount_partition_size;
     size_t            device_sector_size;
@@ -613,6 +619,41 @@ int fatx_fuse_opt_proc(void *data, const char *arg, int key, struct fuse_args *o
         pd->mount_partition_drive = arg[0];
         return 0;
 
+    case FATX_FUSE_OPT_KEY_VARIANT:
+        arg = fatx_fuse_opt_consume_key(arg);
+        if (!strcmp(arg, "auto"))
+        {
+            pd->variant = FATX_VARIANT_AUTO;
+        }
+        else if (!strcmp(arg, "xbox"))
+        {
+            pd->variant = FATX_VARIANT_XBOX;
+        }
+        else if (!strcmp(arg, "x360"))
+        {
+            pd->variant = FATX_VARIANT_X360;
+        }
+        else
+        {
+            fprintf(stderr, "invalid variant '%s' specified (expected auto, xbox or x360)\n", arg);
+            return -1;
+        }
+        return 0;
+
+    case FATX_FUSE_OPT_KEY_PARTITION:
+        /*
+         * Must be duplicated: when this option arrives via -o (as it does
+         * from an fstab-invoked mount helper), arg points into a buffer
+         * libfuse reuses once the whole -o group is processed, so a raw
+         * pointer here would dangle by the time main() reads it back.
+         */
+        pd->mount_partition_name = strdup(fatx_fuse_opt_consume_key(arg));
+        return 0;
+
+    case FATX_FUSE_OPT_KEY_READ_ONLY:
+        pd->read_only = 1;
+        return 0;
+
     case FATX_FUSE_OPT_KEY_OFFSET:
         arg = fatx_fuse_opt_consume_key(arg);
         pd->mount_partition_offset = strtol(arg, NULL, 0);
@@ -655,7 +696,8 @@ int fatx_fuse_opt_proc(void *data, const char *arg, int key, struct fuse_args *o
         return 0;
 
     case FATX_FUSE_OPT_KEY_LOG:
-        pd->log_path = fatx_fuse_opt_consume_key(arg);
+        /* See FATX_FUSE_OPT_KEY_PARTITION: must be duplicated for -o safety. */
+        pd->log_path = strdup(fatx_fuse_opt_consume_key(arg));
         return 0;
 
     case FATX_FUSE_OPT_KEY_LOGLEVEL:
@@ -694,13 +736,19 @@ void fatx_fuse_print_usage(void)
     fprintf(stderr, "FATXFS - Userspace FATX Filesystem Driver\n\n");
     fprintf(stderr, "Usage: %s <device> <mountpoint> [<options>]\n", prog_short_name);
     fprintf(stderr, "   or: %s <device> <mountpoint> --drive=c|e|x|y|z|f [<options>]\n", prog_short_name);
+    fprintf(stderr, "   or: %s <device> <mountpoint> --variant=x360 --partition=<name> [<options>]\n", prog_short_name);
     fprintf(stderr, "   or: %s <device> <mountpoint> --offset=<offset> --size=<size> [<options>]\n\n", prog_short_name);
     fprintf(stderr, "General options:\n"
-                    "    -o opt, [opt...]               mount options\n"
+                    "    -o opt, [opt...]               mount options (FATXFS options below may also\n"
+                    "                                    be given here without their -- prefix, e.g.\n"
+                    "                                    -o variant=x360,partition=data)\n"
                     "    -h --help                      print help\n"
                     "    -V --version                   print version\n\n"
                     "FATXFS options:\n"
-                    "    --drive=<letter>               mount a partition by its drive letter\n"
+                    "    --drive=<letter>               mount an original Xbox partition by its drive letter\n"
+                    "    --variant=<variant>            on-disk byte order: auto (default), xbox or x360\n"
+                    "    --partition=<name>             mount an Xbox 360 partition by name (sysext, sysext2, compat, data)\n"
+                    "    --read-only                    open the device without write access at all (stronger than -o ro)\n"
                     "    --offset=<offset>              specify the offset (in bytes) of a partition manually\n"
                     "    --size=<size>                  specify the size (in bytes) of a partition manually\n"
                     "    --sector-size=<size>           specify the size (in bytes) of a device sector (default is 512)\n"
@@ -734,15 +782,36 @@ int main(int argc, char *argv[])
         FUSE_OPT_KEY("--help",                       FATX_FUSE_OPT_KEY_HELP),
         FUSE_OPT_KEY("-V",                           FATX_FUSE_OPT_KEY_VERSION),
         FUSE_OPT_KEY("--version",                    FATX_FUSE_OPT_KEY_VERSION),
+        /*
+         * Each FATXFS option is matched both as a "--long=value" argument and
+         * as a bare "key=value" mount suboption, since mount(8) invokes
+         * mount helpers (e.g. from fstab) as `mount.fatxfs dev mnt -o
+         * key=value,...` rather than with "--" prefixed flags.
+         */
         FUSE_OPT_KEY("--drive=",                     FATX_FUSE_OPT_KEY_DRIVE),
+        FUSE_OPT_KEY("drive=",                       FATX_FUSE_OPT_KEY_DRIVE),
+        FUSE_OPT_KEY("--variant=",                   FATX_FUSE_OPT_KEY_VARIANT),
+        FUSE_OPT_KEY("variant=",                     FATX_FUSE_OPT_KEY_VARIANT),
+        FUSE_OPT_KEY("--partition=",                 FATX_FUSE_OPT_KEY_PARTITION),
+        FUSE_OPT_KEY("partition=",                   FATX_FUSE_OPT_KEY_PARTITION),
+        FUSE_OPT_KEY("--read-only",                  FATX_FUSE_OPT_KEY_READ_ONLY),
+        FUSE_OPT_KEY("read-only",                    FATX_FUSE_OPT_KEY_READ_ONLY),
         FUSE_OPT_KEY("--offset=",                    FATX_FUSE_OPT_KEY_OFFSET),
+        FUSE_OPT_KEY("offset=",                      FATX_FUSE_OPT_KEY_OFFSET),
         FUSE_OPT_KEY("--size=",                      FATX_FUSE_OPT_KEY_SIZE),
+        FUSE_OPT_KEY("size=",                        FATX_FUSE_OPT_KEY_SIZE),
         FUSE_OPT_KEY("--sector-size=",               FATX_FUSE_OPT_KEY_SECTOR_SIZE),
+        FUSE_OPT_KEY("sector-size=",                 FATX_FUSE_OPT_KEY_SECTOR_SIZE),
         FUSE_OPT_KEY("--format=" ,                   FATX_FUSE_OPT_KEY_FORMAT),
+        FUSE_OPT_KEY("format=" ,                     FATX_FUSE_OPT_KEY_FORMAT),
         FUSE_OPT_KEY("--sectors-per-cluster=" ,      FATX_FUSE_OPT_KEY_SECTORS_PER_CLUSTER),
+        FUSE_OPT_KEY("sectors-per-cluster=" ,        FATX_FUSE_OPT_KEY_SECTORS_PER_CLUSTER),
         FUSE_OPT_KEY("--destroy-all-existing-data",  FATX_FUSE_OPT_KEY_DESTROY_DATA),
+        FUSE_OPT_KEY("destroy-all-existing-data",    FATX_FUSE_OPT_KEY_DESTROY_DATA),
         FUSE_OPT_KEY("--log=",                       FATX_FUSE_OPT_KEY_LOG),
+        FUSE_OPT_KEY("log=",                         FATX_FUSE_OPT_KEY_LOG),
         FUSE_OPT_KEY("--loglevel=",                  FATX_FUSE_OPT_KEY_LOGLEVEL),
+        FUSE_OPT_KEY("loglevel=",                    FATX_FUSE_OPT_KEY_LOGLEVEL),
         FUSE_OPT_END,
     };
 
@@ -767,13 +836,32 @@ int main(int argc, char *argv[])
         goto error_nofs;
     }
 
+    if (pd.mount_partition_drive != 0x00 && pd.mount_partition_name != NULL)
+    {
+        fprintf(stderr, "--drive cannot be used with --partition\n");
+        goto error_nofs;
+    }
+
+    /*
+     * An Xbox 360 disk has no drive letters, so default it to the user content
+     * partition rather than to the original Xbox's 'c'.
+     */
+    if (pd.variant == FATX_VARIANT_X360 &&
+        pd.mount_partition_drive == 0x00 &&
+        pd.mount_partition_name == NULL &&
+        pd.mount_partition_offset == -1 &&
+        pd.mount_partition_size == -1)
+    {
+        pd.mount_partition_name = "data";
+    }
+
     if (pd.mount_partition_offset != -1 || pd.mount_partition_size != -1)
     {
         /* Partition Specified Manually */
 
-        if (pd.mount_partition_drive != 0x00)
+        if (pd.mount_partition_drive != 0x00 || pd.mount_partition_name != NULL)
         {
-            fprintf(stderr, "--drive cannot be used with --offset or --size\n");
+            fprintf(stderr, "--drive/--partition cannot be used with --offset or --size\n");
             goto error_nofs;
         }
 
@@ -786,6 +874,19 @@ int main(int argc, char *argv[])
         if (pd.mount_partition_size == -1)
         {
             fprintf(stderr, "please specify partition size\n");
+            goto error_nofs;
+        }
+    }
+    else if (pd.mount_partition_name != NULL)
+    {
+        /* Xbox 360 Partition Name Specified */
+        status = fatx_x360_partition_to_offset_size(pd.mount_partition_name,
+                                                    &pd.mount_partition_offset,
+                                                    &pd.mount_partition_size);
+        if (status)
+        {
+            fprintf(stderr, "unknown partition '%s' (expected one of: %s)\n",
+                    pd.mount_partition_name, fatx_x360_partition_names());
             goto error_nofs;
         }
     }
@@ -850,12 +951,14 @@ int main(int argc, char *argv[])
     }
 
     /* Open the device */
-    status = fatx_open_device(pd.fs,
-                              pd.device_path,
-                              pd.mount_partition_offset,
-                              pd.mount_partition_size,
-                              pd.device_sector_size,
-                              FATX_READ_FROM_SUPERBLOCK);
+    status = fatx_open_device_ex(pd.fs,
+                                 pd.device_path,
+                                 pd.mount_partition_offset,
+                                 pd.mount_partition_size,
+                                 pd.device_sector_size,
+                                 FATX_READ_FROM_SUPERBLOCK,
+                                 pd.variant,
+                                 pd.read_only ? FATX_OPEN_READ_ONLY : 0);
     if (status)
     {
         fprintf(stderr, "failed to initialize the filesystem\n");

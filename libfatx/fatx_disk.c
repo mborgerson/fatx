@@ -34,6 +34,55 @@ struct fatx_partition_map_entry const fatx_partition_map[] = {
 };
 
 /*
+ * Xbox 360 partition map.
+ *
+ * These offsets are fixed; the 360 has no partition table on disk. Only the
+ * FATX partitions are listed. The two cache partitions that precede them
+ * (0x00080000 and 0x80080000) are not FATX and are deliberately omitted --
+ * offering them here would only produce a confusing signature failure.
+ *
+ * "data" is the user content partition and is the one nearly everybody wants.
+ * Note that 0x120eb0000, widely cited as the data partition, is in fact the
+ * backwards compatibility partition; data begins one partition later.
+ */
+struct fatx_x360_partition_map_entry const fatx_x360_partition_map[] = {
+    { .name = "sysext",  .offset = 0x10c080000, .size = 0x0ce30000 },
+    { .name = "sysext2", .offset = 0x118eb0000, .size = 0x08000000 },
+    { .name = "compat",  .offset = 0x120eb0000, .size = 0x10000000 },
+    { .name = "data",    .offset = 0x130eb0000, .size = -1         },
+};
+
+/*
+ * Given an Xbox 360 partition name, determine partition offset and size (in bytes).
+ */
+int fatx_x360_partition_to_offset_size(char const *name, uint64_t *offset, uint64_t *size)
+{
+    struct fatx_x360_partition_map_entry const *pi;
+
+    for (int i = 0; i < ARRAY_SIZE(fatx_x360_partition_map); i++)
+    {
+        pi = &fatx_x360_partition_map[i];
+
+        if (strcmp(pi->name, name) == 0)
+        {
+            *offset = pi->offset;
+            *size   = pi->size;
+            return FATX_STATUS_SUCCESS;
+        }
+    }
+
+    return FATX_STATUS_ERROR;
+}
+
+/*
+ * The list of valid Xbox 360 partition names, for help and error messages.
+ */
+char const *fatx_x360_partition_names(void)
+{
+    return "sysext, sysext2, compat, data";
+}
+
+/*
  * Given a drive letter, determine partition offset and size (in bytes).
  */
 int fatx_drive_to_offset_size(char drive_letter, uint64_t *offset, uint64_t *size)
@@ -212,6 +261,11 @@ cleanup:
 
 /*
  * Write refurb sector.
+ *
+ * The refurb info is an original Xbox structure living at a fixed offset on the
+ * physical disk, outside any partition, and has no Xbox 360 equivalent. It is
+ * therefore always written little-endian: this function operates on a path
+ * rather than an opened filesystem, so no variant is in scope to swap against.
  */
 int fatx_disk_write_refurb_info(char const *path, uint32_t number_of_boots, uint64_t first_power_on)
 {

@@ -1,0 +1,10 @@
+build/
+install/
+*.img
+__pycache__/
+*.pyc
+venv/
+gate-results/
+src/
+pkg/
+*.pkg.tar.*

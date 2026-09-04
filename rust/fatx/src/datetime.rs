@@ -1,4 +1,5 @@
-const FATX_EPOCH: u16 = 2000;
+use crate::variant::Variant;
+
 pub struct Date {
     year: u16,
     /// 1 = January
@@ -7,9 +8,9 @@ pub struct Date {
 }
 
 impl Date {
-    pub fn from_fatx_encoding(encoded: u16) -> Self {
+    pub fn from_fatx_encoding(encoded: u16, variant: Variant) -> Self {
         Self {
-            year: (((encoded >> 9) & 0x7f) + FATX_EPOCH),
+            year: (((encoded >> 9) & 0x7f) + variant.epoch()),
             month: ((encoded >> 5) & 0xf) as u8,
             day: (encoded & 0x1f) as u8,
         }
@@ -34,10 +35,17 @@ pub struct Time {
 }
 
 impl Time {
-    pub fn from_fatx_encoding(encoded: u16) -> Self {
+    /// The Xbox 360 uses the standard FAT field widths, 5 bits of hour and 6
+    /// of minute. The original Xbox uses 4 and 5, which cannot represent an
+    /// hour past 15 or a minute past 31.
+    pub fn from_fatx_encoding(encoded: u16, variant: Variant) -> Self {
+        let (hour_mask, minute_mask) = match variant {
+            Variant::X360 => (0x1f, 0x3f),
+            _ => (0xf, 0x1f),
+        };
         Self {
-            hour: ((encoded >> 11) & 0xf) as u8,
-            minute: ((encoded >> 5) & 0x1f) as u8,
+            hour: ((encoded >> 11) & hour_mask) as u8,
+            minute: ((encoded >> 5) & minute_mask) as u8,
             second: ((encoded & 0x1f) * 2) as u8,
         }
     }
@@ -59,10 +67,10 @@ pub struct DateTime {
 }
 
 impl DateTime {
-    pub fn from_fatx_encoding(date_encoded: u16, time_encoded: u16) -> Self {
+    pub fn from_fatx_encoding(date_encoded: u16, time_encoded: u16, variant: Variant) -> Self {
         Self {
-            date: Date::from_fatx_encoding(date_encoded),
-            time: Time::from_fatx_encoding(time_encoded),
+            date: Date::from_fatx_encoding(date_encoded, variant),
+            time: Time::from_fatx_encoding(time_encoded, variant),
         }
     }
 

@@ -12,7 +12,13 @@ logging.basicConfig(level=logging.INFO)
 
 def main():
 	ap = argparse.ArgumentParser(description='FATX Filesystem Utility')
-	ap.add_argument('--drive', '-d', default='c', help='Drive letter (default: c)')
+	ap.add_argument('--drive', '-d', default='c', help='Original Xbox drive letter (default: c)')
+	ap.add_argument('--variant', default='auto', choices=['auto', 'xbox', 'x360'],
+	                help='On-disk byte order (default: auto-detect from the partition signature)')
+	ap.add_argument('--partition', default=None, choices=sorted(Fatx.X360_PARTITIONS),
+	                help='Xbox 360 partition to open, by name')
+	ap.add_argument('--read-only', action='store_true',
+	                help='Open the device without write access at all')
 	ap.add_argument('--offset', type=int, default=None, help='Partition offset')
 	ap.add_argument('--size', type=int, default=None, help='Partition size')
 	ap.add_argument('--sector-size', type=int, default=512, help='Drive sector size (default: 512)')
@@ -34,7 +40,14 @@ def main():
 		print(f'Formatting {args.device}')
 		Fatx.format(args.device)
 
-	fs = Fatx(args.device, offset=args.offset, size=args.size, drive=args.drive, sector_size=args.sector_size)
+	partition = args.partition
+	if partition is None and args.variant == 'x360' and args.offset is None:
+		# An Xbox 360 disk has no drive letters, so default to user content.
+		partition = 'data'
+
+	fs = Fatx(args.device, offset=args.offset, size=args.size, drive=args.drive,
+	          sector_size=args.sector_size, variant=args.variant, partition=partition,
+	          read_only=args.read_only)
 	if args.list:
 		for dirpath, dirnames, filenames in fs.walk('/'):
 			for f in filenames:

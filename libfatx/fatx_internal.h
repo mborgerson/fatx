@@ -21,6 +21,7 @@
 #define FATX_INTERNAL_H
 
 #include "fatx.h"
+#include "fatx_endian.h"
 
 /* FATX refurb info signature ('RFRB') */
 #define FATX_REFURB_SIGNATURE        0x42524652
@@ -52,18 +53,37 @@
 /* Mask to be applied when reading directory entry attributes. */
 #define FATX_ATTR_MASK               0x0f
 
-/* The epoch. */
+/*
+ * The epoch.
+ *
+ * The original Xbox counts years from 2000. The Xbox 360 uses the standard FAT
+ * epoch of 1980, confirmed against a retail disk: its factory-written files are
+ * stamped 2005-11-22, the console's launch date, which only decodes correctly
+ * with a 1980 base.
+ */
 #define FATX_EPOCH                   2000
+#define FATX_X360_EPOCH              1980
 
-/* Macros to unpack date/time values. */
+/*
+ * Macros to unpack date/time values.
+ *
+ * The date layout is common to both consoles. The time layout is not: the
+ * original Xbox packs the hour in 4 bits and the minute in 5, while the 360
+ * uses the standard FAT widths of 5 and 6. A retail 360 disk carries hours of
+ * 21 and 23 and minutes of 50 and 59, none of which fit the narrower fields.
+ */
 #define FATX_TIME_TO_HOUR(t)         (((t)>>11)&0xf)
 #define FATX_TIME_TO_MINUTE(t)       (((t)>>5)&0x1f)
 #define FATX_TIME_TO_SECOND(t)       (((t)&0x1f)*2)
-#define FATX_DATE_TO_YEAR(d)         ((((d)>>9)&0x7f)+FATX_EPOCH)
+#define FATX_DATE_TO_YEAR(d, e)      ((((d)>>9)&0x7f)+(e))
 #define FATX_DATE_TO_MONTH(d)        (((d)>>5)&0xf)
 #define FATX_DATE_TO_DAY(d)          ((d)&0x1f)
-#define FATX_DATE(d, m, y)           ((d&0x1f) | ((m&0xf) << 5) | (((y - FATX_EPOCH)&0x7f) << 9))
+#define FATX_DATE(d, m, y, e)        ((d&0x1f) | ((m&0xf) << 5) | (((y - (e))&0x7f) << 9))
 #define FATX_TIME(h, m, s)           (((h&0xf) << 11) | ((m&0x1f) << 5) | ((s / 2)&0x1f))
+
+#define FATX_X360_TIME_TO_HOUR(t)    (((t)>>11)&0x1f)
+#define FATX_X360_TIME_TO_MINUTE(t)  (((t)>>5)&0x3f)
+#define FATX_X360_TIME(h, m, s)      (((h&0x1f) << 11) | ((m&0x3f) << 5) | ((s / 2)&0x1f))
 
 /* Default seperator. */
 #define FATX_PATH_SEPERATOR          '/'
@@ -113,6 +133,16 @@ _Static_assert(sizeof(struct fatx_superblock) == 4096, "fatx_superblock struct *
 /*
  * The directory entry as it appears on disk.
  */
+/*
+ * NOTE: the two halves of each timestamp are stored in the opposite order on
+ * the two consoles. The original Xbox writes the time first and then the date,
+ * as the member names say; the Xbox 360 writes the date first and then the
+ * time. Confirmed against a retail 360 disk, where reading the pair in the
+ * original Xbox's order yields impossible calendar dates for a fifth of the
+ * entries. Always go through fatx_dirent_to_attr/fatx_attr_to_dirent, which
+ * resolve the order from the variant, rather than reading these members
+ * directly.
+ */
 #pragma pack(1)
 struct fatx_raw_directory_entry {
     uint8_t  filename_len;
@@ -120,8 +150,8 @@ struct fatx_raw_directory_entry {
     char     filename[FATX_MAX_FILENAME_LEN];
     uint32_t first_cluster;
     uint32_t file_size;
-    uint16_t modified_time;
-    uint16_t modified_date;
+    uint16_t modified_time; /* date, on the Xbox 360 */
+    uint16_t modified_date; /* time, on the Xbox 360 */
     uint16_t created_time;
     uint16_t created_date;
     uint16_t accessed_time;
@@ -166,9 +196,9 @@ int fatx_mark_end_of_dir(struct fatx_fs *fs, struct fatx_dir *dir);
 
 /* Misc Functions */
 int fatx_get_path_component(char const *path, size_t component, char const **start, size_t *len);
-int fatx_unpack_date(uint16_t in, struct fatx_ts *out);
-int fatx_unpack_time(uint16_t in, struct fatx_ts *out);
-int fatx_pack_date(struct fatx_ts *in, uint16_t *out);
-int fatx_pack_time(struct fatx_ts *in, uint16_t *out);
+int fatx_unpack_date(struct fatx_fs *fs, uint16_t in, struct fatx_ts *out);
+int fatx_unpack_time(struct fatx_fs *fs, uint16_t in, struct fatx_ts *out);
+int fatx_pack_date(struct fatx_fs *fs, struct fatx_ts *in, uint16_t *out);
+int fatx_pack_time(struct fatx_fs *fs, struct fatx_ts *in, uint16_t *out);
 
 #endif

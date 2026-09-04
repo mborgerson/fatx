@@ -212,13 +212,20 @@ int fatx_read_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry *entry)
         }
     }
 
+    /*
+     * The cache holds the FAT window in on-disk byte order, so entries are
+     * swapped here on the way in and out rather than at cache fill/flush time:
+     * the flush rewrites the whole window including entries that were never
+     * touched, so a fill-time swap would have to be exactly inverted on every
+     * flush path, including the early-out when the cache is not dirty.
+     */
     if (fs->fat_type == FATX_FAT_TYPE_16)
     {
-        *entry = ((uint16_t*) cache->data)[index - cache->position];
+        *entry = fatx_from_disk_u16(fs, ((uint16_t*) cache->data)[index - cache->position]);
     }
     else
     {
-        *entry = ((uint32_t*) cache->data)[index - cache->position];
+        *entry = fatx_from_disk_u32(fs, ((uint32_t*) cache->data)[index - cache->position]);
     }
 
     return FATX_STATUS_SUCCESS;
@@ -251,11 +258,11 @@ int fatx_write_fat(struct fatx_fs *fs, size_t index, fatx_fat_entry entry)
 
     if (fs->fat_type == FATX_FAT_TYPE_16)
     {
-        ((uint16_t*) cache->data)[index - cache->position] = entry;
+        ((uint16_t*) cache->data)[index - cache->position] = fatx_to_disk_u16(fs, entry);
     }
     else
     {
-        ((uint32_t*) cache->data)[index - cache->position] = entry;
+        ((uint32_t*) cache->data)[index - cache->position] = fatx_to_disk_u32(fs, entry);
     }
 
     cache->dirty = true;

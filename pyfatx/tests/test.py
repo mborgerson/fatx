@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 import functools
+import importlib.util
 import os
 import tempfile
 import unittest
 import random
 
 from pyfatx import Fatx
+
+X360_IMAGE_BUILDER = os.path.join(
+	os.path.dirname(os.path.abspath(__file__)), '..', '..', 'tests', 'make_x360_image.py')
 
 
 def with_formatted_disk(func):
@@ -448,3 +452,86 @@ class BasicTest(unittest.TestCase):
 
 if __name__ == '__main__':
 	unittest.main()
+
+
+def with_x360_disk(func):
+	"""
+	Provide a synthetic big-endian (Xbox 360) FATX image.
+
+	Built by tests/make_x360_image.py, which assembles the on-disk structures
+	from the format spec rather than with libfatx's own writer -- so a field
+	that is never byte-swapped cannot cancel itself out between the writer and
+	the reader and slip through.
+	"""
+	@functools.wraps(func)
+	def wrapper(*args, **kwargs):
+		spec = importlib.util.spec_from_file_location('make_x360_image', X360_IMAGE_BUILDER)
+		builder = importlib.util.module_from_spec(spec)
+		spec.loader.exec_module(builder)
+
+		image, contents = builder.build()
+		with tempfile.NamedTemporaryFile(delete=False, suffix='-x360') as tmp_file:
+			tmp_file.write(image)
+			path = tmp_file.name
+		try:
+			return func(*args, path, contents, **kwargs)
+		finally:
+			os.remove(path)
+	return wrapper
+
+
+class X360Test(unittest.TestCase):
+	"""
+	Xbox 360 (big-endian) filesystem tests.
+	"""
+
+	IMAGE_SIZE = 16 * 1024 * 1024
+
+	def _open(self, path, **kwargs):
+		kwargs.setdefault('offset', 0)
+		kwargs.setdefault('size', self.IMAGE_SIZE)
+		kwargs.setdefault('read_only', True)
+		return Fatx(path, **kwargs)
+
+	def _names(self, fs, path):
+		return sorted(a.filename for a in fs.listdir(path))
+
+	@with_x360_disk
+	def test_variant_is_autodetected(self, path, contents):
+		# No variant given: the signature alone has to identify the byte order.
+		fs = self._open(path)
+		self.assertEqual(self._names(fs, '/'), ['GAMES', 'HELLO.TXT'])
+
+	@with_x360_disk
+	def test_explicit_variant(self, path, contents):
+		fs = self._open(path, variant='x360')
+		self.assertEqual(self._names(fs, '/'), ['GAMES', 'HELLO.TXT'])
+
+	@with_x360_disk
+	def test_wrong_variant_is_rejected(self, path, contents):
+		# Must fail loudly rather than silently misparse the metadata.
+		with self.assertRaises(AssertionError):
+			self._open(path, variant='xbox')
+
+	@with_x360_disk
+	def test_file_sizes(self, path, contents):
+		fs = self._open(path)
+		for filename, data in contents.items():
+			self.assertEqual(fs.get_attr(filename).file_size, len(data), filename)
+
+	@with_x360_disk
+	def test_file_contents(self, path, contents):
+		fs = self._open(path)
+		for filename, data in contents.items():
+			self.assertEqual(fs.read(filename), data, filename)
+
+	@with_x360_disk
+	def test_subdirectory(self, path, contents):
+		fs = self._open(path)
+		self.assertEqual(self._names(fs, '/GAMES'), ['COVER.JPG'])
+
+	@with_x360_disk
+	def test_read_only_refuses_writes(self, path, contents):
+		fs = self._open(path, read_only=True)
+		with self.assertRaises(AssertionError):
+			fs.mkdir('/SHOULD_NOT_APPEAR')

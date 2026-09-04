@@ -56,22 +56,61 @@ class Fatx:
 	FATX Filesystem Interface
 	"""
 
+	#: Original Xbox partitions, by drive letter.
+	XBOX_PARTITIONS = {
+		'x': (0x00080000, 0x02ee00000),
+		'y': (0x2ee80000, 0x02ee00000),
+		'z': (0x5dc80000, 0x02ee00000),
+		'c': (0x8ca80000, 0x01f400000),
+		'e': (0xabe80000, 0x1312d6000),
+	}
+
+	#: Xbox 360 partitions. The 360 has no drive letters, and no partition
+	#: table either -- these offsets are fixed. 'data' is the user content
+	#: partition and runs to the end of the disk.
+	X360_PARTITIONS = {
+		'sysext':  (0x10c080000, 0x0ce30000),
+		'sysext2': (0x118eb0000, 0x08000000),
+		'compat':  (0x120eb0000, 0x10000000),
+		'data':    (0x130eb0000, 0xffffffffffffffff),
+	}
+
+	VARIANTS = {
+		'auto': FATX_VARIANT_AUTO,
+		'xbox': FATX_VARIANT_XBOX,
+		'x360': FATX_VARIANT_X360,
+	}
+
 	def __init__(self, path: str, offset: Optional[int] = None, size: Optional[int] = None, drive: str = 'c',
-		         sector_size: int = 512):
+		         sector_size: int = 512, variant: str = 'auto', partition: Optional[str] = None,
+		         read_only: bool = False):
+		"""
+		Open a FATX filesystem.
+
+		variant selects the on-disk byte order: 'auto' (default) detects it
+		from the partition signature, 'xbox' is the original Xbox and 'x360'
+		is the big-endian Xbox 360 layout.
+
+		partition names an Xbox 360 partition (see X360_PARTITIONS) and is an
+		alternative to drive, which names an original Xbox one.
+		"""
 		self.fs = pyfatx_open_helper()
 		assert self.fs
-		if offset is None:
-			partitions = {
-				'x': (0x00080000, 0x02ee00000),
-				'y': (0x2ee80000, 0x02ee00000),
-				'z': (0x5dc80000, 0x02ee00000),
-				'c': (0x8ca80000, 0x01f400000),
-				'e': (0xabe80000, 0x1312d6000),
-			}
-			offset, size = partitions[drive]
+
+		if variant not in self.VARIANTS:
+			raise ValueError(f'unknown variant {variant!r}, expected one of {sorted(self.VARIANTS)}')
+		if partition is not None and offset is None:
+			if partition not in self.X360_PARTITIONS:
+				raise ValueError(f'unknown partition {partition!r}, expected one of {sorted(self.X360_PARTITIONS)}')
+			offset, size = self.X360_PARTITIONS[partition]
+		elif offset is None:
+			offset, size = self.XBOX_PARTITIONS[drive]
+
 		if isinstance(path, str):
 			path = path.encode('utf-8')
-		s = fatx_open_device(self.fs, path, offset, size, sector_size, 0)
+		flags = FATX_OPEN_READ_ONLY if read_only else 0
+		s = fatx_open_device_ex(self.fs, path, offset, size, sector_size, 0,
+		                        self.VARIANTS[variant], flags)
 		if s != 0:
 			self.fs = None
 		assert s == 0
